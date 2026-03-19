@@ -1,0 +1,952 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=1280">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body { width: 100%; height: 100%; overflow: hidden; background: #000; }
+    canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; }
+  </style>
+</head>
+<body>
+  <canvas id="bg"></canvas>
+  <script>
+    const canvas = document.getElementById('bg')
+    const ctx = canvas.getContext('2d')
+    canvas.width = window.innerWidth
+    canvas.height = window.innerHeight
+    window.addEventListener('resize', () => {
+      canvas.width = window.innerWidth
+      canvas.height = window.innerHeight
+    })
+
+    const W = () => canvas.width
+    const H = () => canvas.height
+
+    // ── Shared utilities ──
+    function smoothstep(t) {
+      const c = Math.max(0, Math.min(1, t))
+      return c * c * (3 - 2 * c)
+    }
+
+    function drawText(text, x, y, size, color, alpha, options = {}) {
+      ctx.save()
+      ctx.globalAlpha = Math.max(0, Math.min(1, alpha))
+      ctx.font = `${options.weight || 700} ${size}px system-ui, -apple-system, sans-serif`
+      ctx.fillStyle = color
+      ctx.textAlign = options.align || 'center'
+      ctx.textBaseline = options.baseline || 'middle'
+      if (options.glow) {
+        ctx.shadowColor = options.glow
+        ctx.shadowBlur = options.glowSize || 40
+        ctx.fillText(text, x, y)
+        ctx.fillText(text, x, y)
+      }
+      if (options.letterSpacing) {
+        const chars = text.split('')
+        let totalWidth = 0
+        chars.forEach(c => totalWidth += ctx.measureText(c).width + options.letterSpacing)
+        let cx = x - totalWidth / 2
+        chars.forEach(c => {
+          ctx.fillText(c, cx + ctx.measureText(c).width / 2, y)
+          cx += ctx.measureText(c).width + options.letterSpacing
+        })
+      } else {
+        ctx.fillText(text, x, y)
+      }
+      ctx.restore()
+    }
+
+    function drawCornerBranding(alpha, hue) {
+      ctx.save()
+      ctx.globalAlpha = alpha * 0.5
+      // Top-left corner mark
+      ctx.strokeStyle = `hsla(${hue}, 60%, 60%, 0.6)`
+      ctx.lineWidth = 2
+      ctx.beginPath()
+      ctx.moveTo(30, 55); ctx.lineTo(30, 30); ctx.lineTo(55, 30)
+      ctx.stroke()
+      // Top-right corner mark
+      ctx.beginPath()
+      ctx.moveTo(W() - 55, 30); ctx.lineTo(W() - 30, 30); ctx.lineTo(W() - 30, 55)
+      ctx.stroke()
+      // Bottom-left
+      ctx.beginPath()
+      ctx.moveTo(30, H() - 55); ctx.lineTo(30, H() - 30); ctx.lineTo(55, H() - 30)
+      ctx.stroke()
+      // Bottom-right
+      ctx.beginPath()
+      ctx.moveTo(W() - 55, H() - 30); ctx.lineTo(W() - 30, H() - 30); ctx.lineTo(W() - 30, H() - 55)
+      ctx.stroke()
+      // Bottom-right brand text
+      ctx.font = '500 11px system-ui, sans-serif'
+      ctx.fillStyle = `hsla(${hue}, 40%, 70%, 0.7)`
+      ctx.textAlign = 'right'
+      ctx.textBaseline = 'bottom'
+      ctx.fillText('DAZZLE.FM', W() - 40, H() - 38)
+      ctx.restore()
+    }
+
+    function drawGrid(alpha, hue, t, spacing) {
+      ctx.save()
+      ctx.globalAlpha = alpha
+      const sp = spacing || 50
+      const pulse = 0.6 + 0.4 * Math.sin(t * 0.002)
+      for (let x = 0; x < W(); x += sp) {
+        const distFromCenter = Math.abs(x - W() / 2) / (W() / 2)
+        const lineAlpha = (1 - distFromCenter * 0.7) * pulse
+        ctx.strokeStyle = `hsla(${hue}, 60%, 40%, ${0.04 * lineAlpha})`
+        ctx.lineWidth = 1
+        ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, H()); ctx.stroke()
+      }
+      for (let y = 0; y < H(); y += sp) {
+        const distFromCenter = Math.abs(y - H() / 2) / (H() / 2)
+        const lineAlpha = (1 - distFromCenter * 0.7) * pulse
+        ctx.strokeStyle = `hsla(${hue}, 60%, 40%, ${0.04 * lineAlpha})`
+        ctx.lineWidth = 1
+        ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W(), y); ctx.stroke()
+      }
+      ctx.restore()
+    }
+
+    // Rounded rect helper
+    function roundRect(x, y, w, h, r) {
+      ctx.beginPath()
+      ctx.moveTo(x + r, y)
+      ctx.lineTo(x + w - r, y)
+      ctx.quadraticCurveTo(x + w, y, x + w, y + r)
+      ctx.lineTo(x + w, y + h - r)
+      ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h)
+      ctx.lineTo(x + r, y + h)
+      ctx.quadraticCurveTo(x, y + h, x, y + h - r)
+      ctx.lineTo(x, y + r)
+      ctx.quadraticCurveTo(x, y, x + r, y)
+      ctx.closePath()
+    }
+
+
+    // ═══════════════════════════════════════════
+    // SCENE 1: "Hello, World" — Edge-to-edge particle constellation
+    // ═══════════════════════════════════════════
+    const scene1Particles = []
+    for (let i = 0; i < 600; i++) {
+      scene1Particles.push({
+        x: Math.random(),  // 0-1 normalized
+        y: Math.random(),
+        vx: (Math.random() - 0.5) * 0.0003,
+        vy: (Math.random() - 0.5) * 0.0003,
+        size: Math.random() * 2.5 + 0.5,
+        hue: 210 + Math.random() * 80,
+        phase: Math.random() * Math.PI * 2,
+        speed: 0.5 + Math.random() * 1.5,
+      })
+    }
+
+    // Data flourish dots along edges
+    const edgeFlourishes = []
+    for (let i = 0; i < 80; i++) {
+      const side = Math.floor(Math.random() * 4)
+      let x, y
+      if (side === 0) { x = Math.random(); y = 0 }           // top
+      else if (side === 1) { x = Math.random(); y = 1 }      // bottom
+      else if (side === 2) { x = 0; y = Math.random() }      // left
+      else { x = 1; y = Math.random() }                       // right
+      edgeFlourishes.push({
+        x, y, side,
+        offset: Math.random() * 0.05,
+        speed: 0.001 + Math.random() * 0.003,
+        phase: Math.random() * Math.PI * 2,
+        size: 1 + Math.random() * 2,
+      })
+    }
+
+    function scene1(t, alpha) {
+      const cx = W() / 2, cy = H() / 2
+      ctx.save()
+      ctx.globalAlpha = alpha
+
+      // Rich gradient background
+      const bg = ctx.createRadialGradient(cx, cy, 0, cx, cy, Math.max(W(), H()) * 0.7)
+      bg.addColorStop(0, '#0f0a2e')
+      bg.addColorStop(0.5, '#0a0720')
+      bg.addColorStop(1, '#030210')
+      ctx.fillStyle = bg
+      ctx.fillRect(0, 0, W(), H())
+
+      // Animated grid underlay
+      drawGrid(alpha, 240, t, 60)
+
+      // Edge-to-edge particles
+      for (const p of scene1Particles) {
+        p.x += p.vx + Math.sin(t * 0.001 + p.phase) * 0.00005
+        p.y += p.vy + Math.cos(t * 0.001 + p.phase) * 0.00005
+        if (p.x < 0) p.x += 1; if (p.x > 1) p.x -= 1
+        if (p.y < 0) p.y += 1; if (p.y > 1) p.y -= 1
+
+        const px = p.x * W()
+        const py = p.y * H()
+        const pulse = 0.5 + 0.5 * Math.sin(t * 0.004 + p.phase)
+        const distToCenter = Math.hypot(px - cx, py - cy) / Math.max(W(), H())
+        const brightness = 0.4 + 0.6 * (1 - distToCenter)
+
+        ctx.beginPath()
+        ctx.arc(px, py, p.size * (0.7 + pulse * 0.5), 0, Math.PI * 2)
+        ctx.fillStyle = `hsla(${p.hue + pulse * 30}, 80%, ${50 + pulse * 25}%, ${brightness * (0.4 + pulse * 0.4)})`
+        ctx.fill()
+      }
+
+      // Connection lines between nearby particles (sparse sampling)
+      ctx.lineWidth = 0.4
+      for (let i = 0; i < scene1Particles.length; i += 3) {
+        const a = scene1Particles[i]
+        const ax = a.x * W(), ay = a.y * H()
+        for (let j = i + 3; j < scene1Particles.length; j += 4) {
+          const b = scene1Particles[j]
+          const bx = b.x * W(), by = b.y * H()
+          const d = Math.hypot(ax - bx, ay - by)
+          if (d < 90) {
+            ctx.beginPath()
+            ctx.moveTo(ax, ay); ctx.lineTo(bx, by)
+            ctx.strokeStyle = `rgba(150, 130, 255, ${(1 - d / 90) * 0.12})`
+            ctx.stroke()
+          }
+        }
+      }
+
+      // Edge flourish data dots
+      for (const f of edgeFlourishes) {
+        const wave = Math.sin(t * f.speed + f.phase) * f.offset
+        let fx = f.x, fy = f.y
+        if (f.side === 0 || f.side === 1) fx += wave
+        else fy += wave
+        const px = Math.max(0, Math.min(1, fx)) * W()
+        const py = Math.max(0, Math.min(1, fy)) * H()
+        const pulse = 0.5 + 0.5 * Math.sin(t * 0.005 + f.phase)
+        ctx.beginPath()
+        ctx.arc(px, py, f.size * pulse, 0, Math.PI * 2)
+        ctx.fillStyle = `hsla(260, 80%, 70%, ${0.3 + pulse * 0.3})`
+        ctx.fill()
+      }
+
+      // Large central glow
+      const coreGlow = ctx.createRadialGradient(cx, cy - 20, 0, cx, cy - 20, 300)
+      coreGlow.addColorStop(0, 'rgba(120, 90, 255, 0.08)')
+      coreGlow.addColorStop(0.5, 'rgba(100, 60, 220, 0.03)')
+      coreGlow.addColorStop(1, 'transparent')
+      ctx.fillStyle = coreGlow
+      ctx.fillRect(0, 0, W(), H())
+
+      // Horizontal data line accents
+      for (let i = 0; i < 6; i++) {
+        const ly = 100 + i * 100
+        const lx = 60 + Math.sin(t * 0.002 + i) * 30
+        const lw = 40 + Math.sin(t * 0.003 + i * 2) * 20
+        ctx.fillStyle = `hsla(${220 + i * 15}, 70%, 60%, 0.08)`
+        ctx.fillRect(lx, ly, lw, 1.5)
+        // Mirror on right side
+        ctx.fillRect(W() - lx - lw, ly + 20, lw, 1.5)
+      }
+
+      // Corner branding
+      drawCornerBranding(alpha, 250)
+
+      // Hero text — large "Hello, World" with strong glow
+      drawText('Hello, World', cx, cy - 15, 92, '#fff', alpha, {
+        glow: '#8b7cf8', glowSize: 80
+      })
+      // Subtitle
+      drawText('YOUR FIRST DAZZLE STREAM', cx, cy + 60, 17, 'rgba(200,195,255,0.8)', alpha, {
+        weight: 400, letterSpacing: 7
+      })
+      // Top accent line
+      ctx.globalAlpha = alpha * 0.4
+      const lineW = 200
+      ctx.fillStyle = '#8b7cf8'
+      ctx.fillRect(cx - lineW / 2, cy - 70, lineW, 1.5)
+      ctx.fillRect(cx - lineW * 0.4, cy + 85, lineW * 0.8, 1)
+
+      ctx.restore()
+    }
+
+
+    // ═══════════════════════════════════════════
+    // SCENE 2: Terminal typing — full-screen terminal
+    // ═══════════════════════════════════════════
+    const termLines = [
+      { cmd: '$ dazzle s new my-stream', delay: 0 },
+      { out: 'Stage "my-stream" created.', delay: 1800 },
+      { cmd: '$ dazzle s up', delay: 3000 },
+      { out: 'Stage "my-stream" activated (status: running)', delay: 4500 },
+      { out: 'Watch: https://dazzle.fm/watch/a1b2c3d4', delay: 5200 },
+      { cmd: '$ dazzle s sync ./app --watch', delay: 6500 },
+      { out: '3 files synced. Watching for changes...', delay: 8000 },
+      { cmd: '$ dazzle s bc on', delay: 9500 },
+      { out: 'Broadcast started', delay: 11000 },
+    ]
+
+    function scene2(t, alpha) {
+      const cx = W() / 2, cy = H() / 2
+      ctx.save()
+      ctx.globalAlpha = alpha
+
+      // Dark terminal background
+      ctx.fillStyle = '#080810'
+      ctx.fillRect(0, 0, W(), H())
+
+      // Subtle scan lines for CRT feel
+      ctx.globalAlpha = alpha * 0.04
+      for (let y = 0; y < H(); y += 2) {
+        ctx.fillStyle = '#fff'
+        ctx.fillRect(0, y, W(), 1)
+      }
+      ctx.globalAlpha = alpha
+
+      // CRT vignette
+      const vig = ctx.createRadialGradient(cx, cy, H() * 0.2, cx, cy, H() * 0.75)
+      vig.addColorStop(0, 'transparent')
+      vig.addColorStop(1, 'rgba(0,0,0,0.4)')
+      ctx.fillStyle = vig
+      ctx.fillRect(0, 0, W(), H())
+
+      // Subtle moving scan bar
+      const scanY = (t * 0.8) % H()
+      const scanGrad = ctx.createLinearGradient(0, scanY - 40, 0, scanY + 40)
+      scanGrad.addColorStop(0, 'transparent')
+      scanGrad.addColorStop(0.5, 'rgba(100, 200, 150, 0.015)')
+      scanGrad.addColorStop(1, 'transparent')
+      ctx.fillStyle = scanGrad
+      ctx.fillRect(0, scanY - 40, W(), 80)
+
+      // Terminal window chrome — larger, fills more of frame
+      const termX = cx - 530, termY = 45, termW = 1060, termH = 610
+      ctx.fillStyle = 'rgba(12, 12, 22, 0.97)'
+      ctx.strokeStyle = 'rgba(100, 100, 140, 0.2)'
+      ctx.lineWidth = 1
+      roundRect(termX, termY, termW, termH, 12)
+      ctx.fill()
+      ctx.stroke()
+
+      // Subtle outer glow on terminal
+      const termGlow = ctx.createRadialGradient(cx, cy, 100, cx, cy, 600)
+      termGlow.addColorStop(0, 'rgba(80, 200, 120, 0.02)')
+      termGlow.addColorStop(1, 'transparent')
+      ctx.fillStyle = termGlow
+      ctx.fillRect(0, 0, W(), H())
+
+      // Title bar dots
+      const dotY = termY + 22
+      const colors = ['#ff5f57', '#ffbd2e', '#28c840']
+      colors.forEach((c, i) => {
+        ctx.beginPath()
+        ctx.arc(termX + 28 + i * 22, dotY, 6, 0, Math.PI * 2)
+        ctx.fillStyle = c
+        ctx.fill()
+      })
+
+      // Title bar text
+      ctx.font = '500 13px system-ui, monospace'
+      ctx.fillStyle = 'rgba(255,255,255,0.35)'
+      ctx.textAlign = 'center'
+      ctx.fillText('dazzle -- bash -- 120x40', cx, dotY + 1)
+
+      // Divider line
+      ctx.fillStyle = 'rgba(100,100,140,0.12)'
+      ctx.fillRect(termX, termY + 42, termW, 1)
+
+      // Terminal content
+      const lineH = 32
+      const contentY = termY + 70
+      const sceneTime = (t * 16.67) % 14000
+
+      ctx.textAlign = 'left'
+      ctx.font = '500 17px "SF Mono", "Fira Code", Consolas, monospace'
+
+      // Find the latest active command line index (for cursor placement)
+      let latestCmdIdx = -1
+      termLines.forEach((line, i) => {
+        if (line.cmd && sceneTime >= line.delay) latestCmdIdx = i
+      })
+
+      termLines.forEach((line, i) => {
+        const elapsed = sceneTime - line.delay
+        if (elapsed < 0) return
+
+        const y = contentY + i * lineH
+
+        if (line.cmd) {
+          const typeSpeed = 35
+          const charsShown = Math.min(line.cmd.length, Math.floor(elapsed / typeSpeed))
+          const text = line.cmd.substring(0, charsShown)
+
+          if (text.startsWith('$')) {
+            ctx.fillStyle = '#34d399'
+            ctx.fillText('$', termX + 30, y)
+            ctx.fillStyle = '#e2e2e8'
+            ctx.fillText(text.substring(1), termX + 30 + ctx.measureText('$').width, y)
+          }
+
+          // Blinking cursor — only on the latest active command line
+          if (i === latestCmdIdx) {
+            if (charsShown < line.cmd.length || (charsShown === line.cmd.length && Math.sin(t * 0.008) > 0)) {
+              const cursorX = termX + 30 + ctx.measureText(text).width + 2
+              ctx.fillStyle = '#34d399'
+              ctx.fillRect(cursorX, y - 11, 10, 20)
+            }
+          }
+        } else if (line.out) {
+          const fadeIn = Math.min(1, elapsed / 300)
+          ctx.globalAlpha = alpha * fadeIn
+          const isSuccess = line.out.includes('started') || line.out.includes('activated')
+          ctx.fillStyle = isSuccess ? '#34d399' : 'rgba(190, 190, 210, 0.8)'
+          ctx.fillText(line.out, termX + 30, y)
+          ctx.globalAlpha = alpha
+        }
+      })
+
+      // Bottom status bar
+      ctx.fillStyle = 'rgba(30, 120, 80, 0.15)'
+      ctx.fillRect(termX, termY + termH - 30, termW, 30)
+      ctx.font = '400 11px "SF Mono", monospace'
+      ctx.fillStyle = 'rgba(52, 211, 153, 0.7)'
+      ctx.textAlign = 'left'
+      ctx.fillText(' NORMAL  main  utf-8  bash', termX + 12, termY + termH - 12)
+
+      ctx.restore()
+    }
+
+
+    // ═══════════════════════════════════════════
+    // SCENE 3: "How It Works" — Pipeline with animated grid
+    // ═══════════════════════════════════════════
+    // Flow particles along connections
+    const flowParticles = []
+    for (let i = 0; i < 12; i++) {
+      flowParticles.push({
+        connection: Math.floor(Math.random() * 3),
+        progress: Math.random(),
+        speed: 0.0008 + Math.random() * 0.001,
+        size: 2 + Math.random() * 2,
+        hue: 220 + Math.random() * 100,
+      })
+    }
+
+    function scene3(t, alpha) {
+      const cx = W() / 2, cy = H() / 2
+      ctx.save()
+      ctx.globalAlpha = alpha
+
+      // Background
+      const bg = ctx.createLinearGradient(0, 0, W(), H())
+      bg.addColorStop(0, '#070515')
+      bg.addColorStop(0.5, '#0a0820')
+      bg.addColorStop(1, '#060412')
+      ctx.fillStyle = bg
+      ctx.fillRect(0, 0, W(), H())
+
+      // Animated pulsing grid
+      drawGrid(alpha, 260, t, 45)
+
+      // Additional decorative grid highlights
+      const gridPulse = 0.5 + 0.5 * Math.sin(t * 0.003)
+      ctx.strokeStyle = `hsla(260, 80%, 55%, ${0.03 * gridPulse})`
+      ctx.lineWidth = 2
+      // Horizontal highlight line
+      const hlY = cy + Math.sin(t * 0.002) * 50
+      ctx.beginPath(); ctx.moveTo(0, hlY); ctx.lineTo(W(), hlY); ctx.stroke()
+      // Vertical highlight
+      const vlX = cx + Math.cos(t * 0.0015) * 100
+      ctx.beginPath(); ctx.moveTo(vlX, 0); ctx.lineTo(vlX, H()); ctx.stroke()
+
+      // Title at top
+      drawText('How It Works', cx, 55, 42, '#fff', alpha, {
+        glow: '#a78bfa', glowSize: 40
+      })
+
+      // Pipeline boxes — sized and spaced to fit 1280px canvas
+      const boxH = 100, boxW = 200, gap = 65, boxY = cy - boxH / 2 + 15
+      // 4 boxes x 200 + 3 gaps x 65 = 995. Start at cx - 995/2 = cx - 497.5
+      const startX = cx - (4 * boxW + 3 * gap) / 2
+      const allBoxes = [
+        { label: 'Your Code', sub: 'HTML + JS + CSS', x: startX, y: boxY, w: boxW, h: boxH, hue: 210, icon: '</>' },
+        { label: 'dazzle sync', sub: 'File Sync + HMR', x: startX + boxW + gap, y: boxY, w: boxW, h: boxH, hue: 255, icon: '>' },
+        { label: 'Cloud Renderer', sub: '1280 x 720', x: startX + 2 * (boxW + gap), y: boxY, w: boxW, h: boxH, hue: 290, icon: 'D' },
+        { label: 'Broadcast', sub: 'Kick / Twitch / YT', x: startX + 3 * (boxW + gap), y: boxY, w: boxW, h: boxH, hue: 340, icon: 'L' },
+      ]
+
+      // Draw connections between boxes
+      const connections = [
+        { from: allBoxes[0], to: allBoxes[1] },
+        { from: allBoxes[1], to: allBoxes[2] },
+        { from: allBoxes[2], to: allBoxes[3] },
+      ]
+
+      connections.forEach((conn, ci) => {
+        const fromX = conn.from.x + conn.from.w
+        const toX = conn.to.x
+        const midY = boxY + boxH / 2
+
+        // Animated dashes
+        ctx.save()
+        ctx.strokeStyle = `hsla(${conn.from.hue + 20}, 70%, 60%, 0.3)`
+        ctx.lineWidth = 2.5
+        ctx.setLineDash([10, 14])
+        ctx.lineDashOffset = -t * 0.06
+        ctx.beginPath()
+        ctx.moveTo(fromX + 10, midY)
+        ctx.lineTo(toX - 10, midY)
+        ctx.stroke()
+        ctx.setLineDash([])
+        ctx.restore()
+
+        // Arrow head
+        ctx.fillStyle = `hsla(${conn.to.hue}, 70%, 60%, 0.6)`
+        ctx.beginPath()
+        ctx.moveTo(toX - 10, midY - 7)
+        ctx.lineTo(toX - 2, midY)
+        ctx.lineTo(toX - 10, midY + 7)
+        ctx.fill()
+      })
+
+      // Draw flowing particles along connections
+      for (const fp of flowParticles) {
+        fp.progress += fp.speed
+        if (fp.progress > 1) { fp.progress -= 1; fp.connection = (fp.connection + 1) % 3 }
+
+        const conn = connections[fp.connection]
+        if (!conn) continue
+        const fromX = conn.from.x + conn.from.w + 10
+        const toX = conn.to.x - 10
+        const midY = boxY + boxH / 2
+
+        const px = fromX + (toX - fromX) * fp.progress
+        const py = midY + Math.sin(fp.progress * Math.PI * 2 + t * 0.005) * 4
+
+        // Outer glow circle
+        ctx.beginPath()
+        ctx.arc(px, py, fp.size * 3, 0, Math.PI * 2)
+        ctx.fillStyle = `hsla(${fp.hue}, 90%, 70%, 0.15)`
+        ctx.fill()
+
+        // Core dot
+        ctx.beginPath()
+        ctx.arc(px, py, fp.size, 0, Math.PI * 2)
+        ctx.fillStyle = `hsla(${fp.hue}, 90%, 80%, 0.9)`
+        ctx.fill()
+      }
+
+      // Draw boxes
+      allBoxes.forEach((box, i) => {
+        const pulse = 0.7 + 0.3 * Math.sin(t * 0.003 + i * 1.8)
+
+        // Outer glow
+        const glow = ctx.createRadialGradient(
+          box.x + box.w / 2, box.y + box.h / 2, 0,
+          box.x + box.w / 2, box.y + box.h / 2, box.w * 0.9
+        )
+        glow.addColorStop(0, `hsla(${box.hue}, 80%, 50%, ${0.07 * pulse})`)
+        glow.addColorStop(1, 'transparent')
+        ctx.fillStyle = glow
+        ctx.fillRect(box.x - 60, box.y - 60, box.w + 120, box.h + 120)
+
+        // Box fill
+        roundRect(box.x, box.y, box.w, box.h, 12)
+        ctx.fillStyle = `hsla(${box.hue}, 35%, 8%, 0.92)`
+        ctx.fill()
+        ctx.strokeStyle = `hsla(${box.hue}, 65%, 55%, ${0.35 + pulse * 0.2})`
+        ctx.lineWidth = 1.5
+        ctx.stroke()
+
+        // Top accent line inside box
+        ctx.fillStyle = `hsla(${box.hue}, 70%, 55%, ${0.15 + pulse * 0.1})`
+        ctx.fillRect(box.x + 1, box.y + 1, box.w - 2, 3)
+
+        // Icon/symbol
+        ctx.font = '700 24px system-ui, sans-serif'
+        ctx.fillStyle = `hsla(${box.hue}, 70%, 65%, 0.3)`
+        ctx.textAlign = 'center'
+        ctx.textBaseline = 'middle'
+        ctx.fillText(box.icon, box.x + box.w / 2, box.y + 30)
+
+        // Label
+        ctx.font = '600 19px system-ui, sans-serif'
+        ctx.fillStyle = `hsla(${box.hue}, 55%, 85%, 0.95)`
+        ctx.fillText(box.label, box.x + box.w / 2, box.y + box.h / 2 + 2)
+
+        // Sub label
+        ctx.font = '400 13px system-ui, sans-serif'
+        ctx.fillStyle = `hsla(${box.hue}, 40%, 65%, 0.7)`
+        ctx.fillText(box.sub, box.x + box.w / 2, box.y + box.h / 2 + 24)
+      })
+
+      // Bottom subtitle
+      drawText('SYNC  /  RENDER  /  BROADCAST', cx, H() - 55, 14, 'rgba(200,195,255,0.7)', alpha, {
+        weight: 400, letterSpacing: 4
+      })
+
+      // Corner branding
+      drawCornerBranding(alpha, 260)
+
+      ctx.restore()
+    }
+
+
+    // ═══════════════════════════════════════════
+    // SCENE 4: Kinetic typography — capabilities showcase
+    // Full-clear rendering, no trails
+    // ═══════════════════════════════════════════
+    const kineticWords = [
+      { text: 'Canvas 2D', size: 72, hue: 200, speed: 0.4, y: 0.32, glowSize: 50 },
+      { text: 'WebGL', size: 56, hue: 280, speed: -0.35, y: 0.55, glowSize: 40 },
+      { text: 'CSS Animations', size: 48, hue: 160, speed: 0.55, y: 0.72, glowSize: 30 },
+      { text: 'Web Audio', size: 38, hue: 320, speed: -0.6, y: 0.18, glowSize: 25 },
+      { text: 'DOM Manipulation', size: 30, hue: 240, speed: 0.7, y: 0.87, glowSize: 20 },
+      { text: '60 fps', size: 64, hue: 130, speed: -0.45, y: 0.44, glowSize: 45 },
+      { text: 'localStorage', size: 26, hue: 50, speed: 0.8, y: 0.65, glowSize: 18 },
+      { text: 'Live Events', size: 34, hue: 0, speed: -0.5, y: 0.08, glowSize: 22 },
+      { text: 'Fetch API', size: 28, hue: 190, speed: 0.65, y: 0.93, glowSize: 18 },
+      { text: 'WebSockets', size: 32, hue: 110, speed: -0.55, y: 0.26, glowSize: 20 },
+      { text: 'requestAnimationFrame', size: 22, hue: 260, speed: 0.75, y: 0.5, glowSize: 15 },
+      { text: 'SVG', size: 44, hue: 340, speed: -0.38, y: 0.78, glowSize: 30 },
+    ]
+
+    // Background floating particles for scene 4
+    const s4Particles = []
+    for (let i = 0; i < 150; i++) {
+      s4Particles.push({
+        x: Math.random(), y: Math.random(),
+        size: 0.5 + Math.random() * 1.5,
+        hue: 200 + Math.random() * 160,
+        speed: 0.0001 + Math.random() * 0.0003,
+        phase: Math.random() * Math.PI * 2,
+      })
+    }
+
+    function scene4(t, alpha) {
+      const cx = W() / 2, cy = H() / 2
+      ctx.save()
+      ctx.globalAlpha = alpha
+
+      // Full clear — solid background, NO trails
+      const bg = ctx.createRadialGradient(cx, cy, 0, cx, cy, Math.max(W(), H()) * 0.6)
+      bg.addColorStop(0, '#0d0822')
+      bg.addColorStop(0.6, '#08051a')
+      bg.addColorStop(1, '#030210')
+      ctx.fillStyle = bg
+      ctx.fillRect(0, 0, W(), H())
+
+      // Grid underlay
+      drawGrid(alpha, 280, t, 55)
+
+      // Background particles
+      for (const p of s4Particles) {
+        p.x += p.speed
+        if (p.x > 1.05) p.x -= 1.1
+        const px = p.x * W()
+        const py = p.y * H() + Math.sin(t * 0.002 + p.phase) * 15
+        const pulse = 0.4 + 0.6 * Math.sin(t * 0.005 + p.phase)
+        ctx.beginPath()
+        ctx.arc(px, py, p.size * pulse, 0, Math.PI * 2)
+        ctx.fillStyle = `hsla(${p.hue}, 60%, 60%, ${0.15 + pulse * 0.15})`
+        ctx.fill()
+      }
+
+      // Title
+      drawText('What You Can Build', cx, 50, 18, 'rgba(200,195,255,0.8)', alpha, {
+        weight: 400, letterSpacing: 6
+      })
+
+      // Kinetic typography words scrolling across
+      for (const word of kineticWords) {
+        const period = W() + ctx.measureText(word.text).width + 400 // not accurate before font set but close enough
+        const time = t * word.speed
+        // Compute x position: scroll across screen
+        let x
+        if (word.speed > 0) {
+          x = ((time * 0.8) % (W() + 600)) - 300
+        } else {
+          x = W() + 300 - ((Math.abs(time) * 0.8) % (W() + 600))
+        }
+
+        const y = word.y * (H() - 100) + 50
+        const distFromCenter = Math.abs(x - cx) / (W() / 2)
+        const fadeEdge = 1 - Math.pow(Math.max(0, distFromCenter - 0.3) / 0.7, 2)
+        const wordAlpha = Math.max(0, fadeEdge)
+
+        if (wordAlpha < 0.01) continue
+
+        ctx.save()
+        ctx.globalAlpha = alpha * wordAlpha
+
+        // Glow
+        ctx.shadowColor = `hsla(${word.hue}, 90%, 60%, 0.8)`
+        ctx.shadowBlur = word.glowSize
+        ctx.font = `700 ${word.size}px system-ui, sans-serif`
+        ctx.textAlign = 'center'
+        ctx.textBaseline = 'middle'
+        ctx.fillStyle = `hsla(${word.hue}, 75%, 75%, 0.9)`
+        ctx.fillText(word.text, x, y)
+
+        // Second pass for stronger glow on hero words
+        if (word.size > 50) {
+          ctx.shadowBlur = word.glowSize * 1.5
+          ctx.fillText(word.text, x, y)
+        }
+
+        ctx.restore()
+      }
+
+      // Horizontal accent lines
+      ctx.globalAlpha = alpha * 0.08
+      ctx.fillStyle = '#a78bfa'
+      ctx.fillRect(0, H() * 0.25, W(), 1)
+      ctx.fillRect(0, H() * 0.5, W(), 1)
+      ctx.fillRect(0, H() * 0.75, W(), 1)
+      ctx.globalAlpha = alpha
+
+      // Corner branding
+      drawCornerBranding(alpha, 280)
+
+      ctx.restore()
+    }
+
+
+    // ═══════════════════════════════════════════
+    // SCENE 5: "Go Live" — Bold visual statement, no fake data
+    // Massive kinetic text with animated waveform and branding
+    // ═══════════════════════════════════════════
+    const wavePoints = 200
+
+    // Rising particles for celebration effect
+    const s5Particles = []
+    for (let i = 0; i < 120; i++) {
+      s5Particles.push({
+        x: Math.random(),
+        y: Math.random(),
+        speed: 0.001 + Math.random() * 0.003,
+        size: 1 + Math.random() * 2.5,
+        hue: 140 + Math.random() * 40,
+        phase: Math.random() * Math.PI * 2,
+        drift: (Math.random() - 0.5) * 0.0005,
+      })
+    }
+
+    function scene5(t, alpha) {
+      const cx = W() / 2, cy = H() / 2
+      ctx.save()
+      ctx.globalAlpha = alpha
+
+      // Background — deep with green-tinted center
+      const bg = ctx.createRadialGradient(cx, cy - 60, 0, cx, cy, Math.max(W(), H()) * 0.7)
+      bg.addColorStop(0, '#0a1218')
+      bg.addColorStop(0.4, '#080e14')
+      bg.addColorStop(1, '#040810')
+      ctx.fillStyle = bg
+      ctx.fillRect(0, 0, W(), H())
+
+      // Grid
+      drawGrid(alpha, 160, t, 50)
+
+      // Rising celebration particles
+      for (const p of s5Particles) {
+        p.y -= p.speed
+        p.x += p.drift + Math.sin(t * 0.003 + p.phase) * 0.0002
+        if (p.y < -0.05) { p.y = 1.05; p.x = Math.random() }
+        if (p.x < 0) p.x += 1; if (p.x > 1) p.x -= 1
+
+        const px = p.x * W()
+        const py = p.y * H()
+        const pulse = 0.4 + 0.6 * Math.sin(t * 0.005 + p.phase)
+
+        ctx.beginPath()
+        ctx.arc(px, py, p.size * pulse, 0, Math.PI * 2)
+        ctx.fillStyle = `hsla(${p.hue}, 70%, 65%, ${0.15 + pulse * 0.2})`
+        ctx.fill()
+      }
+
+      // Large central glow
+      const heroGlow = ctx.createRadialGradient(cx, cy - 60, 0, cx, cy - 60, 400)
+      heroGlow.addColorStop(0, 'rgba(52, 211, 153, 0.07)')
+      heroGlow.addColorStop(0.5, 'rgba(52, 211, 153, 0.02)')
+      heroGlow.addColorStop(1, 'transparent')
+      ctx.fillStyle = heroGlow
+      ctx.fillRect(0, 0, W(), H())
+
+      // Hero text — massive "Go Live"
+      ctx.save()
+      ctx.globalAlpha = alpha
+      ctx.font = '800 160px system-ui, sans-serif'
+      ctx.textAlign = 'center'
+      ctx.textBaseline = 'middle'
+      // Green glow layers
+      ctx.shadowColor = 'rgba(52, 211, 153, 0.5)'
+      ctx.shadowBlur = 100
+      ctx.fillStyle = '#34d399'
+      ctx.fillText('Go Live', cx, cy - 80)
+      ctx.shadowBlur = 150
+      ctx.fillText('Go Live', cx, cy - 80)
+      // White text on top
+      ctx.shadowBlur = 0
+      ctx.fillStyle = '#fff'
+      ctx.fillText('Go Live', cx, cy - 80)
+      ctx.restore()
+
+      // Subtitle
+      drawText('Start broadcasting with one command', cx, cy + 15, 20, 'rgba(200,220,210,0.8)', alpha, {
+        weight: 400
+      })
+
+      // "dazzle s bc on" in monospace below subtitle
+      ctx.save()
+      ctx.globalAlpha = alpha * 0.6
+      ctx.font = '500 16px "SF Mono", "Fira Code", Consolas, monospace'
+      ctx.textAlign = 'center'
+      ctx.textBaseline = 'middle'
+      ctx.fillStyle = '#34d399'
+      ctx.fillText('$ dazzle s bc on', cx, cy + 55)
+      ctx.restore()
+
+      // Horizontal divider
+      ctx.globalAlpha = alpha * 0.2
+      ctx.fillStyle = '#34d399'
+      ctx.fillRect(cx - 300, cy + 85, 600, 1)
+      ctx.globalAlpha = alpha
+
+      // Animated waveform filling bottom third — purely decorative audio-style visualization
+      const waveY = cy + 110
+      const waveH = 180
+      const waveLeft = 60
+      const waveRight = W() - 60
+      const waveWidth = waveRight - waveLeft
+
+      // Waveform fill gradient
+      const waveGrad = ctx.createLinearGradient(0, waveY, 0, waveY + waveH)
+      waveGrad.addColorStop(0, 'rgba(52, 211, 153, 0.12)')
+      waveGrad.addColorStop(1, 'rgba(52, 211, 153, 0.01)')
+
+      // Primary waveform
+      ctx.beginPath()
+      ctx.moveTo(waveLeft, waveY + waveH)
+      for (let i = 0; i < wavePoints; i++) {
+        const x = waveLeft + (i / (wavePoints - 1)) * waveWidth
+        const val =
+          Math.sin(i * 0.08 + t * 0.004) * 0.3 +
+          Math.sin(i * 0.03 - t * 0.003) * 0.25 +
+          Math.sin(i * 0.15 + t * 0.006) * 0.1 +
+          Math.sin(i * 0.02 + t * 0.001) * 0.15 +
+          0.5
+        const y = waveY + waveH - val * waveH
+        ctx.lineTo(x, y)
+      }
+      ctx.lineTo(waveRight, waveY + waveH)
+      ctx.closePath()
+      ctx.fillStyle = waveGrad
+      ctx.fill()
+
+      // Waveform stroke
+      ctx.beginPath()
+      for (let i = 0; i < wavePoints; i++) {
+        const x = waveLeft + (i / (wavePoints - 1)) * waveWidth
+        const val =
+          Math.sin(i * 0.08 + t * 0.004) * 0.3 +
+          Math.sin(i * 0.03 - t * 0.003) * 0.25 +
+          Math.sin(i * 0.15 + t * 0.006) * 0.1 +
+          Math.sin(i * 0.02 + t * 0.001) * 0.15 +
+          0.5
+        const y = waveY + waveH - val * waveH
+        if (i === 0) ctx.moveTo(x, y)
+        else ctx.lineTo(x, y)
+      }
+      ctx.strokeStyle = 'rgba(52, 211, 153, 0.5)'
+      ctx.lineWidth = 2
+      ctx.stroke()
+
+      // Secondary waveform for depth
+      ctx.beginPath()
+      for (let i = 0; i < wavePoints; i++) {
+        const x = waveLeft + (i / (wavePoints - 1)) * waveWidth
+        const val = Math.sin(i * 0.06 - t * 0.003) * 0.2 +
+                    Math.sin(i * 0.04 + t * 0.002) * 0.2 + 0.4
+        const y = waveY + waveH - val * waveH
+        if (i === 0) ctx.moveTo(x, y)
+        else ctx.lineTo(x, y)
+      }
+      ctx.strokeStyle = 'rgba(100, 160, 255, 0.25)'
+      ctx.lineWidth = 1.5
+      ctx.stroke()
+
+      // Faint horizontal reference lines in waveform area
+      ctx.globalAlpha = alpha * 0.06
+      ctx.strokeStyle = '#34d399'
+      ctx.lineWidth = 0.5
+      for (let i = 1; i < 4; i++) {
+        const ly = waveY + (waveH / 4) * i
+        ctx.beginPath(); ctx.moveTo(waveLeft, ly); ctx.lineTo(waveRight, ly); ctx.stroke()
+      }
+      ctx.globalAlpha = alpha
+
+      // Top label
+      drawText('READY TO STREAM', cx, 45, 13, 'rgba(180,210,200,0.7)', alpha, {
+        weight: 400, letterSpacing: 8
+      })
+
+      // Corner branding
+      drawCornerBranding(alpha, 160)
+
+      ctx.restore()
+    }
+
+
+    // ═══════════════════════════════════════════
+    // SCENE MANAGER — fade through black, full clear every frame
+    // ═══════════════════════════════════════════
+    const scenes = [scene1, scene2, scene3, scene4, scene5]
+    const SCENE_DUR = 12000   // 12 seconds per scene
+    const FADE_DUR = 2000     // 2 second fade on each end
+
+    let sceneIdx = 0
+    let sceneStart = performance.now()
+    let frame = 0
+
+    function loop(now) {
+      frame++
+      const elapsed = now - sceneStart
+
+      // Scene transition
+      if (elapsed >= SCENE_DUR + FADE_DUR) {
+        sceneIdx = (sceneIdx + 1) % scenes.length
+        sceneStart = now
+      }
+
+      // Calculate scene alpha (fade through black)
+      const sceneElapsed = now - sceneStart
+      let sceneAlpha = 1
+      if (sceneElapsed < FADE_DUR) {
+        sceneAlpha = sceneElapsed / FADE_DUR
+      } else if (sceneElapsed > SCENE_DUR) {
+        sceneAlpha = 1 - (sceneElapsed - SCENE_DUR) / FADE_DUR
+      }
+      sceneAlpha = smoothstep(sceneAlpha)
+
+      // Full black clear every frame — prevents any trail artifacts
+      ctx.clearRect(0, 0, W(), H())
+      ctx.fillStyle = '#000'
+      ctx.fillRect(0, 0, W(), H())
+
+      // Draw scene at computed alpha
+      try {
+        scenes[sceneIdx](frame, sceneAlpha)
+      } catch (e) {
+        // If a scene errors, skip to next to prevent permanent black
+        ctx.restore() // attempt to unwind any stuck save state
+        sceneIdx = (sceneIdx + 1) % scenes.length
+        sceneStart = now
+      }
+
+      requestAnimationFrame(loop)
+    }
+
+    requestAnimationFrame(loop)
+  </script>
+</body>
+</html>
