@@ -1,0 +1,124 @@
+@import 'tailwindcss';
+
+@theme {
+  --color-bg: #000000;
+  --color-scene1-bg: #0f0a2e;
+  --color-scene1-deep: #030210;
+  --color-terminal-bg: #080810;
+  --color-scene3-bg: #070515;
+  --color-scene4-bg: #0d0822;
+  --color-scene5-bg: #0a1218;
+  --color-green: #34d399;
+  --color-purple: #8b7cf8;
+  --color-purple-light: #a78bfa;
+  --color-text: #e8e8f0;
+  --color-text-dim: #888899;
+  --font-mono: 'SF Mono', 'Fira Code', 'Cascadia Code', Consolas, monospace;
+}
+
+body {
+  font-family: system-ui, -apple-system, sans-serif;
+  background: #000;
+  color: var(--color-text);
+}
+
+/* Scene fade transitions */
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes fadeOut {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+
+/* Terminal cursor blink */
+@keyframes cursorBlink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
+}
+
+.animate-cursor-blink {
+  animation: cursorBlink 800ms step-end infinite;
+}
+
+/* CRT scan line animation */
+@keyframes scanMove {
+  from { transform: translateY(-80px); }
+  to { transform: translateY(720px); }
+}
+
+.animate-scan-move {
+  animation: scanMove 4s linear infinite;
+}
+
+/* Terminal typing animation */
+@keyframes typeIn {
+  from { max-width: 0; }
+  to { max-width: 100%; }
+}
+
+/* Pipeline dash flow */
+@keyframes dashFlow {
+  from { stroke-dashoffset: 24; }
+  to { stroke-dashoffset: 0; }
+}
+
+.animate-dash-flow {
+  animation: dashFlow 1s linear infinite;
+}
+
+/* Pipeline box pulse */
+@keyframes boxPulse {
+  0%, 100% { opacity: 0.35; }
+  50% { opacity: 0.55; }
+}
+
+.animate-box-pulse {
+  animation: boxPulse 3s ease-in-out infinite;
+}
+
+/* Kinetic scroll right */
+@keyframes scrollRight {
+  from { transform: translateX(-120%); }
+  to { transform: translateX(120%); }
+}
+
+/* Kinetic scroll left */
+@keyframes scrollLeft {
+  from { transform: translateX(120%); }
+  to { transform: translateX(-120%); }
+}
+
+/* Float up for particles */
+@keyframes floatUp {
+  from {
+    transform: translateY(0);
+    opacity: 0.3;
+  }
+  to {
+    transform: translateY(-720px);
+    opacity: 0;
+  }
+}
+
+/* Gentle text glow pulse */
+@keyframes glowPulse {
+  0%, 100% { text-shadow: 0 0 20px currentColor, 0 0 40px currentColor; }
+  50% { text-shadow: 0 0 30px currentColor, 0 0 60px currentColor; }
+}
+
+.animate-glow-pulse {
+  animation: glowPulse 3s ease-in-out infinite;
+}
+
+/* Grid pulse */
+@keyframes gridPulse {
+  0%, 100% { opacity: 0.03; }
+  50% { opacity: 0.06; }
+}
+
+.animate-grid-pulse {
+  animation: gridPulse 4s ease-in-out infinite;
+}

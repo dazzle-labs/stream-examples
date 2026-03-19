@@ -1,0 +1,66 @@
+@import 'tailwindcss';
+
+@theme {
+  --color-bg: #0a0a0c;
+  --color-panel: #0c0e14;
+  --color-border: #1a1a2e;
+  --color-cyan: #00d4ff;
+  --color-claude: #da7756;
+  --color-success: #4ade80;
+  --color-error: #f87171;
+  --color-dim: #666688;
+  --color-text: #e8e8f0;
+  --color-text-dim: #888899;
+  --font-mono: 'SF Mono', 'Fira Code', 'Cascadia Code', 'JetBrains Mono', Consolas, monospace;
+}
+
+body {
+  font-family: system-ui, -apple-system, sans-serif;
+  background: var(--color-bg);
+  color: var(--color-text);
+}
+
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateY(12px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1.0);
+  }
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+
+@keyframes glowFade {
+  0% {
+    background-color: rgba(0, 212, 255, 0.08);
+  }
+  100% {
+    background-color: transparent;
+  }
+}
+
+.animate-slide-in {
+  animation: slideIn 0.35s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+.animate-pulse-slow {
+  animation: pulse 3s ease-in-out infinite;
+}
+
+.animate-glow {
+  animation: glowFade 2s ease-out forwards;
+}
+
+.scrollbar-none::-webkit-scrollbar {
+  display: none;
+}
+.scrollbar-none {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
