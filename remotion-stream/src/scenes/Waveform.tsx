@@ -1,4 +1,4 @@
-import { AbsoluteFill, interpolate, spring, useVideoConfig, Easing } from 'remotion'
+import { AbsoluteFill, interpolate, spring, useVideoConfig } from 'remotion'
 
 // Scene: Waveform
 // A single undulating waveform stretches edge to edge. Full bleed.

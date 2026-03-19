@@ -14,10 +14,7 @@ set -euo pipefail
 # Read the full hook payload from stdin
 INPUT=$(cat)
 
-# Bail if DAZZLE_STAGE is not set
-if [[ -z "${DAZZLE_STAGE:-}" ]]; then
-  exit 0
-fi
+# DAZZLE_STAGE is optional — events also go to local bridge at localhost:7777
 
 # Bail if jq is not available
 if ! command -v jq &>/dev/null; then
@@ -58,7 +55,7 @@ bump_stat() {
   local count
   count=$(echo "$updated" | jq -r '.event_count')
   if (( count % 5 == 0 )); then
-    dazzle stage event emit stats "$updated" --stage "$DAZZLE_STAGE" &
+    emit_event stats "$updated"
   fi
 }
 
@@ -116,6 +113,21 @@ safe_truncate() {
   truncate "$(redact "$s")" "$max"
 }
 
+# Helper: emit to both Dazzle stage AND local WebSocket bridge
+emit_event() {
+  local event_name="$1"
+  local event_json="$2"
+  # Dazzle stage (if DAZZLE_STAGE is set)
+  if [[ -n "${DAZZLE_STAGE:-}" ]]; then
+    dazzle stage event emit "$event_name" "$event_json" --stage "$DAZZLE_STAGE" &
+  fi
+  # Local bridge (always try, fails silently if not running)
+  curl -s -X POST http://localhost:7777/event \
+    -H 'Content-Type: application/json' \
+    -d "{\"event\":\"$event_name\",\"data\":$(echo "$event_json" | jq -c '.')}" \
+    2>/dev/null &
+}
+
 # Extract the hook event name
 HOOK_TYPE=$(echo "$INPUT" | jq -r '.hook_event_name // .hook_type // empty')
 
@@ -136,7 +148,7 @@ case "$HOOK_TYPE" in
     PROMPT_SAFE=$(safe_truncate "$PROMPT" 300)
     EVENT_JSON=$(jq -nc --arg prompt "$PROMPT_SAFE" \
       '{prompt: $prompt}')
-    dazzle stage event emit user_message "$EVENT_JSON" --stage "$DAZZLE_STAGE" &
+    emit_event user_message "$EVENT_JSON"
     bump_stat "event_count" 0  # just trigger the periodic stats emit
     ;;
 
@@ -149,7 +161,7 @@ case "$HOOK_TYPE" in
     STOP_ACTIVE=$(echo "$INPUT" | jq -r '.stop_hook_active // false')
     EVENT_JSON=$(jq -nc --arg message "$MESSAGE_SAFE" --arg stop_active "$STOP_ACTIVE" \
       '{message: $message, stop_active: $stop_active}')
-    dazzle stage event emit assistant_message "$EVENT_JSON" --stage "$DAZZLE_STAGE" &
+    emit_event assistant_message "$EVENT_JSON"
     bump_stat "event_count" 0
     ;;
 
@@ -175,7 +187,7 @@ case "$HOOK_TYPE" in
     }' > "$STATS_FILE"
     EVENT_JSON=$(jq -nc --arg model "$MODEL" --arg session_id "$SESSION_ID" \
       '{model: $model, session_id: $session_id}')
-    dazzle stage event emit session_start "$EVENT_JSON" --stage "$DAZZLE_STAGE" &
+    emit_event session_start "$EVENT_JSON"
     ;;
 
   # ═══════════════════════════════════════════════════════════════
@@ -187,7 +199,7 @@ case "$HOOK_TYPE" in
     MESSAGE_SAFE=$(safe_truncate "$MESSAGE" 300)
     EVENT_JSON=$(jq -nc --arg type "$NOTIF_TYPE" --arg message "$MESSAGE_SAFE" \
       '{type: $type, message: $message}')
-    dazzle stage event emit notification "$EVENT_JSON" --stage "$DAZZLE_STAGE" &
+    emit_event notification "$EVENT_JSON"
     ;;
 
   # ═══════════════════════════════════════════════════════════════
@@ -282,7 +294,7 @@ case "$HOOK_TYPE" in
           '{tool: $tool, snippet: $snippet}')
         ;;
     esac
-    dazzle stage event emit tool_start "$EVENT_JSON" --stage "$DAZZLE_STAGE" &
+    emit_event tool_start "$EVENT_JSON"
     ;;
 
   # ═══════════════════════════════════════════════════════════════
@@ -300,7 +312,7 @@ case "$HOOK_TYPE" in
       ERROR_TRUNC=$(safe_truncate "$ERROR_MSG" 300)
       ERROR_JSON=$(jq -nc --arg tool "$TOOL_NAME" --arg error "$ERROR_TRUNC" \
         '{tool: $tool, error: $error}')
-      dazzle stage event emit error "$ERROR_JSON" --stage "$DAZZLE_STAGE" &
+      emit_event error "$ERROR_JSON"
     fi
 
     case "$TOOL_NAME" in
@@ -380,7 +392,7 @@ case "$HOOK_TYPE" in
           '{tool: $tool, success: $success, snippet: $snippet}')
         ;;
     esac
-    dazzle stage event emit tool_end "$EVENT_JSON" --stage "$DAZZLE_STAGE" &
+    emit_event tool_end "$EVENT_JSON"
     ;;
 
   # ═══════════════════════════════════════════════════════════════
@@ -393,7 +405,7 @@ case "$HOOK_TYPE" in
     DESC_TRUNC=$(truncate "$DESC")
     EVENT_JSON=$(jq -nc --arg agent_id "$AGENT_ID" --arg agent_type "$AGENT_TYPE" --arg description "$DESC_TRUNC" \
       '{agent_id: $agent_id, agent_type: $agent_type, description: $description}')
-    dazzle stage event emit agent_start "$EVENT_JSON" --stage "$DAZZLE_STAGE" &
+    emit_event agent_start "$EVENT_JSON"
     ;;
 
   SubagentStop)
@@ -401,7 +413,7 @@ case "$HOOK_TYPE" in
     AGENT_TYPE=$(echo "$INPUT" | jq -r '.agent_type // "Explore"')
     EVENT_JSON=$(jq -nc --arg agent_id "$AGENT_ID" --arg agent_type "$AGENT_TYPE" \
       '{agent_id: $agent_id, agent_type: $agent_type}')
-    dazzle stage event emit agent_stop "$EVENT_JSON" --stage "$DAZZLE_STAGE" &
+    emit_event agent_stop "$EVENT_JSON"
     ;;
 
 esac

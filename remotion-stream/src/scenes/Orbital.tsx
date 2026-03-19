@@ -1,4 +1,4 @@
-import { AbsoluteFill, interpolate, spring, useVideoConfig, Easing } from 'remotion'
+import { AbsoluteFill, interpolate, spring, useVideoConfig } from 'remotion'
 
 // Scene: Orbital
 // A single ring of particles rotates slowly. Particles pulse and breathe.

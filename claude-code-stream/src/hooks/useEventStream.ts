@@ -100,16 +100,13 @@ export function useEventStream() {
     })
   }, [])
 
-  useEffect(() => {
-    function handleEvent(e: Event) {
-      const ce = e as CustomEvent
-      if (!ce.detail) return
-
-      const eventType = ce.detail.event as string
-      let data = ce.detail.data ?? {}
-      if (typeof data === 'string') {
-        try { data = JSON.parse(data) } catch { data = {} }
-      }
+  // Process a raw event (shared by Dazzle CustomEvent and WebSocket)
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const processEvent = useCallback((eventType: string, rawData: any) => {
+    let data = rawData ?? {}
+    if (typeof data === 'string') {
+      try { data = JSON.parse(data) } catch { data = {} }
+    }
 
       if (eventType === 'tool_start') {
         const tool = String(data.tool ?? 'Unknown')
@@ -259,11 +256,49 @@ export function useEventStream() {
           linesRemoved: Number(data.lines_removed ?? 0),
         })
       }
+  }, [addFeedEvent, recordFile, setAgents, setModel, setStats, setUsage])
+
+  // Dazzle CustomEvent listener
+  useEffect(() => {
+    function handleDazzleEvent(e: Event) {
+      const ce = e as CustomEvent
+      if (!ce.detail) return
+      processEvent(ce.detail.event as string, ce.detail.data)
+    }
+    window.addEventListener('event', handleDazzleEvent)
+    return () => window.removeEventListener('event', handleDazzleEvent)
+  }, [processEvent])
+
+  // WebSocket bridge (local dev)
+  useEffect(() => {
+    const WS_URL = 'ws://localhost:7777'
+    let ws: WebSocket | null = null
+    let retryTimeout: ReturnType<typeof setTimeout>
+
+    function connect() {
+      try {
+        ws = new WebSocket(WS_URL)
+        ws.onmessage = (msg) => {
+          try {
+            const parsed = JSON.parse(String(msg.data)) as { event: string, data: unknown }
+            processEvent(parsed.event, parsed.data)
+          } catch { /* ignore malformed */ }
+        }
+        ws.onclose = () => {
+          retryTimeout = setTimeout(connect, 3000)
+        }
+        ws.onerror = () => {
+          ws?.close()
+        }
+      } catch { /* WebSocket not available */ }
     }
 
-    window.addEventListener('event', handleEvent)
-    return () => window.removeEventListener('event', handleEvent)
-  }, [addFeedEvent, recordFile])
+    connect()
+    return () => {
+      clearTimeout(retryTimeout)
+      ws?.close()
+    }
+  }, [processEvent])
 
   return {
     feedEvents,
