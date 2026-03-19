@@ -1,8 +1,8 @@
 # Dazzle Stream Examples
 
-Live streaming powered by AI agents and code. Write HTML, sync it to the cloud, broadcast it to the world.
+Live streaming powered by AI agents and code. Build with React, TypeScript, and Tailwind -- sync it to the cloud, broadcast it to the world.
 
-[Dazzle](https://dazzle.fm) gives you a cloud browser at 1280x720. You write standard HTML/CSS/JS, Dazzle renders it, and broadcasts the output as a live stream. CSS animations, Canvas 2D, SVG, Web Audio -- all of it works. These examples show you what's possible, from cinematic motion graphics to real-time AI coding visualizations.
+[Dazzle](https://dazzle.fm) gives you a cloud browser at 1280x720. You build a web app, Dazzle renders it, and broadcasts the output as a live stream. React, CSS animations, Canvas 2D, SVG, Web Audio -- all of it works. These examples show you what's possible, from cinematic motion graphics to real-time AI coding visualizations.
 
 ## The Killer Feature: Stream Your Claude Code Session
 
@@ -26,10 +26,11 @@ dazzle login
 # Create a stage
 dazzle stage create my-stage
 
-# Pick an example, sync it, go live
-dazzle stage sync ./hello-world --watch
-dazzle stage screenshot --out preview.png
-dazzle stage broadcast start
+# Pick an example, build it, sync it, go live
+cd hello-world && npm install && npm run build && cd ..
+dazzle stage sync ./hello-world/dist --stage my-stage --watch
+dazzle stage screenshot --stage my-stage --out preview.png
+dazzle stage broadcast start --stage my-stage
 ```
 
 That's it. Your content is rendering in a cloud browser at 1280x720 and broadcasting to your configured destination (Kick, Twitch, YouTube, or custom RTMP).
@@ -38,36 +39,28 @@ That's it. Your content is rendering in a cloud browser at 1280x720 and broadcas
 
 | Example | What It Does |
 |---------|-------------|
-| [`hello-world`](./hello-world) | Broadcast-quality visual showcase -- 5 cinematic scenes cycling through particles, terminal animation, pipeline diagrams, kinetic typography, and waveform. Proves the full pipeline and looks incredible doing it. |
+| [`hello-world`](./hello-world) | Broadcast-quality visual showcase -- 5 cinematic scenes cycling through particles, terminal animation, pipeline diagrams, kinetic typography, and waveform. React/TypeScript/Tailwind with Canvas 2D background layers. Proves the full pipeline and looks incredible doing it. |
 | [`remotion-stream`](./remotion-stream) | Cinematic motion graphics built with Remotion -- signal lock, counting numbers, full-bleed waveforms, typewriter titles, and orbital particles. Spring physics, text decode effects, hard-cut transitions. This is what broadcast-quality React looks like. |
-| [`claude-code-stream`](./claude-code-stream) | Live visualization of a Claude Code session. Every tool call, file edit, search, and subagent spawn appears on stream in real time. Installable as a Claude Code skill -- hook it up and every coding session becomes a live broadcast. |
+| [`claude-code-stream`](./claude-code-stream) | Live visualization of a Claude Code session. Every tool call, file edit, search, and subagent spawn appears on stream in real time. React/TypeScript/Tailwind with a scrolling event feed and sidebar panels for file activity, agents, session stats, usage, and activity sparkline. Installable as a Claude Code skill -- hook it up and every coding session becomes a live broadcast. |
 
 ## How Dazzle Works
 
 ```
-Your Code  -->  dazzle stage sync  -->  Cloud Browser  -->  Broadcast
-(HTML/JS)       (CLI)                   (1280x720)          (Kick/Twitch/YT)
+Your Code  -->  npm run build  -->  dazzle stage sync  -->  Cloud Browser  -->  Broadcast
+(React/TS)      (dist/)              (CLI)                   (1280x720)          (Kick/Twitch/YT)
 ```
 
-You write standard HTML/CSS/JS. Dazzle syncs it to a cloud browser, captures the viewport at 30fps, and broadcasts the output. CSS animations, Canvas 2D, SVG, and Web Audio all work. Use whatever libraries you want via CDN.
+You build a web app with whatever tools you like -- React, Vite, Tailwind, plain HTML. Dazzle syncs the built output to a cloud browser, captures the viewport at 30fps, and broadcasts it. Every example in this repo uses `npm run build` to produce a `dist/` directory, then syncs that to a stage.
 
 ## Writing Your Own
 
-Every example is a directory with an `index.html`. No build step, no framework required.
+Every example is a Vite project that builds to a `dist/` directory. The simplest setup:
 
-```html
-<!DOCTYPE html>
-<html>
-<head>
-  <style>
-    * { margin: 0; box-sizing: border-box; }
-    body { width: 100vw; height: 100vh; overflow: hidden; background: #000; }
-  </style>
-</head>
-<body>
-  <!-- your content here -->
-</body>
-</html>
+```bash
+npm create vite@latest my-stream -- --template react-ts
+cd my-stream && npm install
+npm run build
+dazzle stage sync ./dist --stage my-stage --watch
 ```
 
 Key constraints:
@@ -78,6 +71,8 @@ Key constraints:
 - **Assets**: keep images under 2MB, use WebP/AVIF, no video files
 
 For the full content authoring guide: `dazzle guide` or [dazzle.fm/guide.md](https://dazzle.fm/guide.md)
+
+All three examples use `--stage` explicitly in every CLI command. Always specify which stage you're targeting.
 
 ## Sending Live Data
 

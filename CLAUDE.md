@@ -4,9 +4,9 @@ Public examples repo for [Dazzle](https://dazzle.fm). Each directory is a standa
 
 ## Code Quality
 
-- **TypeScript where applicable.** Examples that use a build step (like `remotion-stream`) use TypeScript with strict mode, zero `any` types, no semicolons, single quotes, trailing commas.
+- **TypeScript everywhere.** All examples use TypeScript with strict mode, zero `any` types, no semicolons, single quotes, trailing commas.
 - **No type safety bypasses.** Never use `as any`, `as unknown`, type assertions, `// @ts-ignore`, or `// @ts-expect-error`. Fix the root cause.
-- **Plain HTML examples are fine.** `hello-world` and `claude-code-stream` are single `index.html` files with no build step. That's a feature -- it proves the pipeline needs nothing more than a browser.
+- **Every example builds.** All three examples (`hello-world`, `remotion-stream`, `claude-code-stream`) are React/TypeScript/Tailwind projects with Vite. Run `npm install && npm run build`, then sync `dist/` to a stage.
 - **Examples must be self-contained.** Each example directory is independently runnable. No shared dependencies across examples.
 - **Minimal dependencies.** Only import what the example actually needs. No kitchen-sink installs.
 
@@ -40,8 +40,7 @@ Public examples repo for [Dazzle](https://dazzle.fm). Each directory is a standa
 ## Examples Structure
 
 - Each example lives in its own directory at the repo root
-- Plain HTML examples (`hello-world`, `claude-code-stream`): just `index.html` and `README.md`, runnable by syncing the directory to a Dazzle stage
-- Build-step examples (`remotion-stream`): `package.json`, `tsconfig.json`, source files, `README.md` -- runnable with `npm install && npm start`, deployable by building and syncing `dist/`
+- All examples are React/TypeScript/Tailwind projects with Vite: `package.json`, `tsconfig.json`, `src/`, `README.md` -- runnable with `npm install && npm run dev`, deployable by building (`npm run build`) and syncing `dist/`
 - Each is independently runnable -- no monorepo tooling needed
 - API keys come from environment variables, never hardcoded
 - CLI commands always use full unabbreviated names: `dazzle stage create`, `dazzle stage broadcast start`, `dazzle stage screenshot --out`

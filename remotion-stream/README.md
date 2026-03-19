@@ -33,13 +33,13 @@ npm run build
 dazzle stage create remotion-stream
 
 # Sync the built output
-dazzle stage sync ./dist --watch
+dazzle stage sync ./dist --stage remotion-stream --watch
 
 # Verify it looks right
-dazzle stage screenshot --out preview.png
+dazzle stage screenshot --stage remotion-stream --out preview.png
 
 # Go live
-dazzle stage broadcast start
+dazzle stage broadcast start --stage remotion-stream
 ```
 
 ## Scenes

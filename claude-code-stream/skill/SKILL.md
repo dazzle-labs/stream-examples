@@ -43,7 +43,7 @@ If an existing stage is inactive, bring it up with `dazzle stage up --stage <nam
 
 ## Step 3: Sync the visualization
 
-The visualization HTML is bundled at `${CLAUDE_SKILL_DIR}/../index.html`. Sync the parent directory:
+The visualization is a React/TypeScript/Tailwind app bundled at `${CLAUDE_SKILL_DIR}/..`. Build it and sync the `dist/` output:
 
 ```bash
 cd ${CLAUDE_SKILL_DIR}/.. && npm install && npm run build
