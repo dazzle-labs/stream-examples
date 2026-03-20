@@ -21,7 +21,7 @@ npm run build
 
 ```bash
 # Install the Dazzle CLI
-curl -sSL https://raw.githubusercontent.com/dazzle-labs/stream-examples/main/install.sh | sh
+curl -sSL https://dazzle.fm/install.sh | sh
 
 # Create a stage
 dazzle stage create hello-world

@@ -11,7 +11,7 @@ Live streaming powered by AI agents and code. Build with React, TypeScript, and 
 Watch an AI coding agent work in real time. Every file read, every edit, every grep, every bash command -- rendered live on stream as it happens.
 
 ```bash
-curl -sSL https://raw.githubusercontent.com/dazzle-labs/stream-examples/main/install.sh | sh
+curl -sSL https://dazzle.fm/install.sh | sh
 ```
 
 The [`claude-code-stream`](./claude-code-stream) example hooks into Claude Code's tool system and pushes every action to a Dazzle stage. Your audience sees exactly what the AI sees, as it sees it. Installable as a Claude Code skill -- one command and you're live.
@@ -20,7 +20,7 @@ The [`claude-code-stream`](./claude-code-stream) example hooks into Claude Code'
 
 ```bash
 # Install the Dazzle CLI
-curl -sSL https://raw.githubusercontent.com/dazzle-labs/stream-examples/main/install.sh | sh
+curl -sSL https://dazzle.fm/install.sh | sh
 
 # Authenticate
 dazzle login

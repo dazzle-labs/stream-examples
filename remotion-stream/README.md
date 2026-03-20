@@ -13,7 +13,7 @@ Using Remotion's `<Player>` component to render a React-based composition direct
 ## Prerequisites
 
 - [Node.js](https://nodejs.org) 18+
-- [Dazzle CLI](https://dazzle.fm) (`curl -sSL https://raw.githubusercontent.com/dazzle-labs/stream-examples/main/install.sh | sh`)
+- [Dazzle CLI](https://dazzle.fm) (`curl -sSL https://dazzle.fm/install.sh | sh`)
 
 ## Run It
 

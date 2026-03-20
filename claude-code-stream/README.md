@@ -22,7 +22,7 @@ Claude Code fires hooks on every tool use. The relay script (`relay.sh`) reads t
 
 ## Prerequisites
 
-- [Dazzle CLI](https://dazzle.fm) -- `curl -sSL https://raw.githubusercontent.com/dazzle-labs/stream-examples/main/install.sh | sh`
+- [Dazzle CLI](https://dazzle.fm) -- `curl -sSL https://dazzle.fm/install.sh | sh`
 - [jq](https://jqlang.github.io/jq/) -- `brew install jq` (macOS) or `apt install jq` (Linux)
 - [Claude Code](https://claude.ai/claude-code) -- Anthropic's CLI for Claude
 
