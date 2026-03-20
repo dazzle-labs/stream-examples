@@ -1,98 +1,53 @@
 # Dazzle Stream Examples
 
-Live streaming powered by AI agents and code. Build with React, TypeScript, and Tailwind -- sync it to the cloud, broadcast it to the world.
+Runnable examples for [Dazzle](https://dazzle.fm) — cloud stages that render and broadcast your content as a live stream.
 
-![Claude Code Stream](claude-code-stream/preview.png)
+## Examples
 
-[Dazzle](https://dazzle.fm) gives you a cloud browser at 1280x720. You build a web app, Dazzle renders it, and broadcasts the output as a live stream. React, CSS animations, Canvas 2D, SVG, Web Audio -- all of it works. These examples show you what's possible, from cinematic motion graphics to real-time AI coding visualizations.
-
-## The Killer Feature: Stream Your Claude Code Session
-
-Watch an AI coding agent work in real time. Every file read, every edit, every grep, every bash command -- rendered live on stream as it happens.
-
-```bash
-curl -sSL https://dazzle.fm/install.sh | sh
-```
-
-The [`claude-code-stream`](./claude-code-stream) example hooks into Claude Code's tool system and pushes every action to a Dazzle stage. Your audience sees exactly what the AI sees, as it sees it. Installable as a Claude Code skill -- one command and you're live.
+| Example | Description |
+|---------|-------------|
+| [`hello-world`](./hello-world) | 5 cinematic scenes — particles, terminal, pipeline, kinetic typography, waveform. React/TypeScript/Tailwind with Canvas 2D backgrounds. |
+| [`remotion-stream`](./remotion-stream) | Motion graphics with Remotion — signal lock, counting numbers, waveforms, typewriter, orbital particles. Spring physics and hard-cut transitions. |
+| [`claude-code-stream`](./claude-code-stream) | Live visualization of a Claude Code session. Every tool call, file edit, search, and agent spawn on stream in real time. Installable as a skill. |
 
 ## Quick Start
 
 ```bash
-# Install the Dazzle CLI
+# Install Dazzle
 curl -sSL https://dazzle.fm/install.sh | sh
-
-# Authenticate
 dazzle login
 
 # Create a stage
 dazzle stage create my-stage
 
-# Pick an example, build it, sync it, go live
+# Pick an example, build, sync
 cd hello-world && npm install && npm run build && cd ..
-dazzle stage sync ./hello-world/dist --stage my-stage --watch
-dazzle stage screenshot --stage my-stage --out preview.png
+dazzle stage sync ./hello-world/dist --stage my-stage
 ```
 
-That's it. Broadcasting starts automatically when the stage activates. Your content is rendering in a cloud browser at 1280x720 and streaming to your configured destination (Kick, Twitch, YouTube, or custom RTMP).
+Broadcasting starts automatically when the stage activates.
 
-## Examples
-
-| Example | What It Does |
-|---------|-------------|
-| [`hello-world`](./hello-world) | Broadcast-quality visual showcase -- 5 cinematic scenes cycling through particles, terminal animation, pipeline diagrams, kinetic typography, and waveform. React/TypeScript/Tailwind with Canvas 2D background layers. Proves the full pipeline and looks incredible doing it. |
-| [`remotion-stream`](./remotion-stream) | Cinematic motion graphics built with Remotion -- signal lock, counting numbers, full-bleed waveforms, typewriter titles, and orbital particles. Spring physics, text decode effects, hard-cut transitions. This is what broadcast-quality React looks like. |
-| [`claude-code-stream`](./claude-code-stream) | Live visualization of a Claude Code session. Every tool call, file edit, search, and subagent spawn appears on stream in real time. React/TypeScript/Tailwind with a scrolling event feed and sidebar panels for file activity, agents, session stats, usage, and activity sparkline. Installable as a Claude Code skill -- hook it up and every coding session becomes a live broadcast. |
-
-## How Dazzle Works
+## How It Works
 
 ```
-Your Code  -->  npm run build  -->  dazzle stage sync  -->  Cloud Browser  -->  Broadcast
-(React/TS)      (dist/)              (CLI)                   (1280x720)          (Kick/Twitch/YT)
+Your Code  →  npm run build  →  dazzle stage sync  →  Cloud Browser  →  Live Stream
+(React/TS)     (dist/)            (CLI)                 (1280x720)        (Kick/Twitch/YT)
 ```
 
-You build a web app with whatever tools you like -- React, Vite, Tailwind, plain HTML. Dazzle syncs the built output to a cloud browser, captures the viewport at 30fps, and broadcasts it. Every example in this repo uses `npm run build` to produce a `dist/` directory, then syncs that to a stage.
+Build a web app. Dazzle syncs it to a cloud browser at 1280x720, captures at 30fps, broadcasts the output. React, Canvas 2D, SVG, Web Audio — all work.
 
-## Writing Your Own
+## Key Constraints
 
-Every example is a Vite project that builds to a `dist/` directory. The simplest setup:
+- **1280x720** fixed resolution, 30fps capture, software renderer
+- **CSS animations and Canvas 2D** are the sweet spot — no heavy shaders
+- **Full viewport, no scroll** — 16:9 with 40px safe area
+- Every CLI command uses `--stage` explicitly
 
-```bash
-npm create vite@latest my-stream -- --template react-ts
-cd my-stream && npm install
-npm run build
-dazzle stage sync ./dist --stage my-stage --watch
-```
-
-Key constraints:
-- **1280x720 fixed resolution**, 30fps capture
-- **Software renderer** -- no hardware GPU. CSS animations, Canvas 2D, and SVG are the sweet spot. Avoid fragment shaders or multi-pass WebGL.
-- **Full viewport, no scroll** -- design for 16:9 with a 40px safe area from edges
-- **Text**: 16px+ body, 24px+ headings, high contrast, sans-serif
-- **Assets**: keep images under 2MB, use WebP/AVIF, no video files
-
-For the full content authoring guide: `dazzle guide` or [dazzle.fm/guide.md](https://dazzle.fm/guide.md)
-
-All three examples use `--stage` explicitly in every CLI command. Always specify which stage you're targeting.
-
-## Sending Live Data
-
-Push real-time data to your running page without re-syncing:
-
-```bash
-dazzle stage event emit score '{"points": 42}'
-```
-
-```js
-window.addEventListener('event', (e) => {
-  const { event, data } = e.detail
-  if (event === 'score') el.textContent = data.points
-})
-```
+See `dazzle guide` or [dazzle.fm/guide.md](https://dazzle.fm/guide.md) for the full authoring guide.
 
 ## Links
 
-- [Dazzle](https://dazzle.fm) -- platform
-- [CLI source](https://github.com/dazzle-labs/cli) -- open source
-- [Content guide](https://dazzle.fm/guide.md) -- performance tips, what works at 60fps
-- [LLM reference](https://dazzle.fm/llms.txt) -- full platform spec for AI agents
+- [Dazzle](https://dazzle.fm)
+- [CLI source](https://github.com/dazzle-labs/cli)
+- [Content guide](https://dazzle.fm/guide.md)
+- [LLM reference](https://dazzle.fm/llms.txt)
