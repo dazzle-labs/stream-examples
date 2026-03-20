@@ -2,6 +2,8 @@
 
 Runnable examples for [Dazzle](https://dazzle.fm) — cloud stages that render and broadcast your content as a live stream.
 
+![Preview](hello-world/preview.png)
+
 ## Examples
 
 | Example | Description |
