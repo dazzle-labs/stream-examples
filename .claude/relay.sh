@@ -91,8 +91,8 @@ redact() {
     -e 's/(xoxp-[a-zA-Z0-9]{8})[a-zA-Z0-9-]*/\1[REDACTED]/g' \
     -e 's/(AKIA[A-Z0-9]{12})[A-Z0-9]*/\1[REDACTED]/g' \
     -e 's/(Bearer )[a-zA-Z0-9_.-]+/\1[REDACTED]/g' \
-    -e 's/([A-Z_]*(?:KEY|SECRET|TOKEN|PASSWORD|CREDENTIAL|AUTH)[A-Z_]*=)[^\s"]+/\1[REDACTED]/g' \
-    -e 's/([a-z_]*(?:key|secret|token|password|credential|auth)[a-z_]*[=:]["'"'"' ]*)[a-zA-Z0-9_.-]{16,}/\1[REDACTED]/g'
+    -e 's/([A-Z_]*(KEY|SECRET|TOKEN|PASSWORD|CREDENTIAL|AUTH)[A-Z_]*=)[^ "]+/\1[REDACTED]/g' \
+    -e 's/([a-z_]*(key|secret|token|password|credential|auth)[a-z_]*[=:]["'"'"' ]*)[a-zA-Z0-9_.-]{16,}/\1[REDACTED]/g'
 }
 
 # Helper: check if a file path is sensitive and should not have content broadcast

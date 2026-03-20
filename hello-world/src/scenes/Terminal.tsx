@@ -14,8 +14,7 @@ const termLines: TermLine[] = [
   { out: 'Watch: https://dazzle.fm/watch/a1b2c3d4', delay: 5200 },
   { cmd: '$ dazzle stage sync ./app --watch', delay: 6500 },
   { out: '3 files synced. Watching for changes...', delay: 8000 },
-  { cmd: '$ dazzle stage broadcast on', delay: 9500 },
-  { out: 'Broadcast started', delay: 11000 },
+  { out: 'Broadcast started automatically.', delay: 9500 },
 ]
 
 const TYPE_SPEED = 35

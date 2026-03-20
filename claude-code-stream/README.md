@@ -4,12 +4,18 @@ Live visualization of an AI coding agent at work. Every tool call -- file reads,
 
 This is the one you want to show people.
 
+![Preview](preview.png)
+
 ## How It Works
 
 ```
 Claude Code  -->  Hook (relay.sh)  -->  Dazzle Event  -->  Stage Visualization
 (tool call)       (extracts data)       (dazzle stage      (renders on stream)
-                                         event emit)
+                        |                event emit)
+                        |
+                        +------------>  Local Bridge   -->  Vite Dev Server
+                                        (localhost:7777     (localhost:5173)
+                                         WebSocket)
 ```
 
 Claude Code fires hooks on every tool use. The relay script (`relay.sh`) reads the hook payload from stdin, extracts the tool name, file path, command, search pattern, or agent info, then pushes a structured event to your Dazzle stage via `dazzle stage event emit`. The visualization is a React/TypeScript/Tailwind app that listens for those events and renders them in a two-column layout: a scrolling event feed on the left and sidebar panels on the right. Tool starts appear immediately; tool completions update with success/failure status and result previews.
@@ -100,12 +106,108 @@ cat > .claude/settings.local.json << 'EOF'
 }
 EOF
 
-# 5. Start broadcasting
-dazzle stage broadcast start --stage my-session
-
-# 6. Start coding -- every tool call now appears on stream
+# 5. Start coding -- broadcasting starts automatically when the stage activates
 claude
 ```
+
+## Local Development
+
+No Dazzle account needed. The visualization runs locally with Vite and a WebSocket bridge that replaces the Dazzle event pipeline.
+
+### 1. Start the dev servers
+
+```bash
+cd claude-code-stream
+npm install
+npm run local
+```
+
+This starts two processes via `concurrently`:
+- **Vite** (`npm run dev`) on `http://localhost:5173` -- serves the React visualization with hot reload
+- **WebSocket bridge** (`npm run bridge`) on `http://localhost:7777` -- accepts POST requests at `/event` and broadcasts them over WebSocket to connected browsers
+
+Open `http://localhost:5173` in your browser. You'll see the "AWAITING SIGNAL" idle state.
+
+### 2. Configure hooks to use the local bridge
+
+The relay script (`scripts/relay.sh`) already sends events to `http://localhost:7777` in addition to any Dazzle stage. When `DAZZLE_STAGE` is unset, events go only to the local bridge.
+
+In the project where you want to stream Claude Code, create `.claude/settings.local.json`:
+
+```json
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": ".*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/absolute/path/to/claude-code-stream/scripts/relay.sh"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": ".*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/absolute/path/to/claude-code-stream/scripts/relay.sh"
+          }
+        ]
+      }
+    ],
+    "SubagentStart": [
+      {
+        "matcher": ".*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/absolute/path/to/claude-code-stream/scripts/relay.sh"
+          }
+        ]
+      }
+    ],
+    "SubagentStop": [
+      {
+        "matcher": ".*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/absolute/path/to/claude-code-stream/scripts/relay.sh"
+          }
+        ]
+      }
+    ]
+  }
+}
+```
+
+Replace `/absolute/path/to/claude-code-stream` with the actual path on your machine. Note: no `DAZZLE_STAGE` prefix -- events go only to the local bridge.
+
+### 3. Start Claude Code
+
+```bash
+claude
+```
+
+Every tool call now appears in your browser at `http://localhost:5173`.
+
+### 4. Test without Claude Code
+
+You can send events directly to verify the pipeline:
+
+```bash
+curl -s -X POST http://localhost:7777/event \
+  -H 'Content-Type: application/json' \
+  -d '{"event":"tool_start","data":"{\"tool\":\"Read\",\"file\":\"/src/App.tsx\"}"}'
+```
+
+### How it works
+
+The `useEventStream` hook in `src/hooks/useEventStream.ts` connects to `ws://localhost:7777` automatically. In production (on a Dazzle stage), it listens for Dazzle CustomEvents instead. Both paths feed into the same `processEvent` function, so the visualization behaves identically in local dev and production.
 
 ## What You'll See
 
@@ -161,4 +263,5 @@ Restart Claude Code after removing hooks for the change to take effect.
 | `src/hooks/useEventStream.ts` | Processes Dazzle events into React state (feed, files, agents, stats, usage) |
 | `src/types.ts` | TypeScript types for events, files, agents, stats, usage |
 | `scripts/relay.sh` | Hook script -- reads tool event JSON from stdin, extracts relevant fields per tool type, emits structured Dazzle events via `dazzle stage event emit` |
+| `scripts/server.ts` | Local WebSocket bridge -- Express server that accepts POST `/event` and broadcasts over WebSocket to connected browsers |
 | `skill/SKILL.md` | Installable Claude Code skill that walks through the full setup interactively |

@@ -43,4 +43,4 @@ Public examples repo for [Dazzle](https://dazzle.fm). Each directory is a standa
 - All examples are React/TypeScript/Tailwind projects with Vite: `package.json`, `tsconfig.json`, `src/`, `README.md` -- runnable with `npm install && npm run dev`, deployable by building (`npm run build`) and syncing `dist/`
 - Each is independently runnable -- no monorepo tooling needed
 - API keys come from environment variables, never hardcoded
-- CLI commands always use full unabbreviated names: `dazzle stage create`, `dazzle stage broadcast start`, `dazzle stage screenshot --out`
+- CLI commands always use full unabbreviated names: `dazzle stage create`, `dazzle stage screenshot --out`

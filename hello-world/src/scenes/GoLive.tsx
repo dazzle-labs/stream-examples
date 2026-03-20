@@ -217,7 +217,7 @@ export function GoLive() {
 
         {/* Command */}
         <p className="mt-[22px] text-[15px] font-medium font-mono text-green/60">
-          $ dazzle stage broadcast on
+          $ dazzle stage up
         </p>
 
         {/* Divider */}

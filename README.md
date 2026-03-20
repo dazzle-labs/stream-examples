@@ -2,6 +2,8 @@
 
 Live streaming powered by AI agents and code. Build with React, TypeScript, and Tailwind -- sync it to the cloud, broadcast it to the world.
 
+![Claude Code Stream](claude-code-stream/preview.png)
+
 [Dazzle](https://dazzle.fm) gives you a cloud browser at 1280x720. You build a web app, Dazzle renders it, and broadcasts the output as a live stream. React, CSS animations, Canvas 2D, SVG, Web Audio -- all of it works. These examples show you what's possible, from cinematic motion graphics to real-time AI coding visualizations.
 
 ## The Killer Feature: Stream Your Claude Code Session
@@ -30,10 +32,9 @@ dazzle stage create my-stage
 cd hello-world && npm install && npm run build && cd ..
 dazzle stage sync ./hello-world/dist --stage my-stage --watch
 dazzle stage screenshot --stage my-stage --out preview.png
-dazzle stage broadcast start --stage my-stage
 ```
 
-That's it. Your content is rendering in a cloud browser at 1280x720 and broadcasting to your configured destination (Kick, Twitch, YouTube, or custom RTMP).
+That's it. Broadcasting starts automatically when the stage activates. Your content is rendering in a cloud browser at 1280x720 and streaming to your configured destination (Kick, Twitch, YouTube, or custom RTMP).
 
 ## Examples
 

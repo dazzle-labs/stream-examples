@@ -115,11 +115,7 @@ IMPORTANT: The hooks command must use the ABSOLUTE path to relay.sh, not the var
 dazzle stage screenshot --out /tmp/claude-code-stream-preview.png --stage <stage-name>
 ```
 
-Show the screenshot to the user. Then start broadcasting:
-
-```bash
-dazzle stage broadcast start --stage <stage-name>
-```
+Show the screenshot to the user. Broadcasting starts automatically when the stage activates -- no separate broadcast command needed.
 
 ## Done
 

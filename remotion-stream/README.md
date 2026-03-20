@@ -4,6 +4,8 @@ Cinematic motion graphics built with [Remotion](https://remotion.dev) and render
 
 No dashboards. No cards. No fake data. One hero per scene. Everything breathes.
 
+![Preview](preview.png)
+
 ## What It Demonstrates
 
 Using Remotion's `<Player>` component to render a React-based composition directly in the browser, then syncing the built output to a Dazzle stage for live broadcasting. Every animation is driven by `useCurrentFrame()` and Remotion's `spring()` physics -- no CSS transitions, no `requestAnimationFrame`. Time is deterministic. The composition loops every 20 seconds at 30fps, matching Dazzle's capture rate.
@@ -37,9 +39,6 @@ dazzle stage sync ./dist --stage remotion-stream --watch
 
 # Verify it looks right
 dazzle stage screenshot --stage remotion-stream --out preview.png
-
-# Go live
-dazzle stage broadcast start --stage remotion-stream
 ```
 
 ## Scenes

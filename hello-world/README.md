@@ -2,6 +2,8 @@
 
 A broadcast-quality visual showcase built with React, TypeScript, and Tailwind. Five cinematic scenes, smooth fades through black, 60fps on a software renderer. This is the proof that the Dazzle pipeline works -- and that "hello world" doesn't have to look like one.
 
+![Preview](preview.png)
+
 ## Run It
 
 ```bash
@@ -30,9 +32,6 @@ dazzle stage sync ./dist --stage hello-world --watch
 
 # Verify it looks right
 dazzle stage screenshot --stage hello-world --out preview.png
-
-# Go live
-dazzle stage broadcast start --stage hello-world
 ```
 
 ## What You'll See
