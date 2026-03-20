@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import type { FeedEvent, FileEntry, AgentEntry, SessionStats, UsageData } from '../types'
+import type { EventType, FeedEvent, FileEntry, AgentEntry, SessionStats, UsageData } from '../types'
 import { NOISE_TOOLS } from '../types'
 
 let eventCounter = 0
@@ -258,15 +258,24 @@ export function useEventStream() {
       }
   }, [addFeedEvent, recordFile, setAgents, setModel, setStats, setUsage])
 
-  // Dazzle CustomEvent listener
+  // Dazzle CustomEvent listeners (named events with parsed JSON detail)
   useEffect(() => {
-    function handleDazzleEvent(e: Event) {
+    const eventTypes: EventType[] = [
+      'tool_start', 'tool_end', 'agent_start', 'agent_stop',
+      'user_message', 'assistant_message', 'session_start',
+      'error', 'notification', 'stats', 'usage',
+    ]
+
+    function handler(e: Event) {
       const ce = e as CustomEvent
       if (!ce.detail) return
-      processEvent(ce.detail.event as string, ce.detail.data)
+      processEvent(e.type, ce.detail)
     }
-    window.addEventListener('event', handleDazzleEvent)
-    return () => window.removeEventListener('event', handleDazzleEvent)
+
+    for (const t of eventTypes) window.addEventListener(t, handler)
+    return () => {
+      for (const t of eventTypes) window.removeEventListener(t, handler)
+    }
   }, [processEvent])
 
   // WebSocket bridge (local dev)
