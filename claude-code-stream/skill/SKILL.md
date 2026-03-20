@@ -121,6 +121,6 @@ Show the screenshot to the user. Broadcasting starts automatically when the stag
 
 Tell the user:
 - The stream is live at the watch URL. Every tool call appears in real time.
-- To stop: `dazzle stage broadcast off --stage <stage-name>`
+- To stop: `dazzle stage down --stage <stage-name>`
 - To remove hooks: delete `.claude/settings.local.json`
 - Restart Claude Code for hooks to take effect.

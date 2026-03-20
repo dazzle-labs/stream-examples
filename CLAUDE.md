@@ -6,7 +6,6 @@ Public examples repo for [Dazzle](https://dazzle.fm). Each directory is a standa
 
 - **TypeScript everywhere.** All examples use TypeScript with strict mode, zero `any` types, no semicolons, single quotes, trailing commas.
 - **No type safety bypasses.** Never use `as any`, `as unknown`, type assertions, `// @ts-ignore`, or `// @ts-expect-error`. Fix the root cause.
-- **Every example builds.** All three examples (`hello-world`, `remotion-stream`, `claude-code-stream`) are React/TypeScript/Tailwind projects with Vite. Run `npm install && npm run build`, then sync `dist/` to a stage.
 - **Examples must be self-contained.** Each example directory is independently runnable. No shared dependencies across examples.
 - **Minimal dependencies.** Only import what the example actually needs. No kitchen-sink installs.
 
@@ -37,10 +36,13 @@ Public examples repo for [Dazzle](https://dazzle.fm). Each directory is a standa
 - **Every example needs a README** with: what it demonstrates, how to run it, what you should see.
 - **No inventory docs.** The filesystem IS the inventory.
 
+## Content Authoring
+
+Follow the Dazzle content authoring guide: https://dazzle.fm/guide.md
+
 ## Examples Structure
 
 - Each example lives in its own directory at the repo root
-- All examples are React/TypeScript/Tailwind projects with Vite: `package.json`, `tsconfig.json`, `src/`, `README.md` -- runnable with `npm install && npm run dev`, deployable by building (`npm run build`) and syncing `dist/`
 - Each is independently runnable -- no monorepo tooling needed
 - API keys come from environment variables, never hardcoded
-- CLI commands always use full unabbreviated names: `dazzle stage create`, `dazzle stage screenshot --out`
+- CLI commands always use full unabbreviated names: `dazzle stage create`, `dazzle stage up`, `dazzle stage screenshot --out`
