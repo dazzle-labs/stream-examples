@@ -9,6 +9,7 @@ Runnable examples for [Dazzle](https://dazzle.fm) -- cloud stages that render an
 - **[`hello-world`](./hello-world)** -- Cinematic motion graphics. The simplest proof that the pipeline works.
 - **[`remotion-stream`](./remotion-stream)** -- Motion graphics with [Remotion](https://remotion.dev). Deterministic, frame-perfect animation.
 - **[`claude-code-stream`](./claude-code-stream)** -- Live visualization of a Claude Code session. Every tool call on stream in real time.
+- **[`hyperstructure`](./hyperstructure)** -- Raymarched fractal lattice with procedural audio. Pure GPU shader + generative drone. Requires a GPU stage.
 
 ## Quick Start
 
