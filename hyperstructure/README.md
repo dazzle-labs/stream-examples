@@ -24,4 +24,4 @@ dazzle stage sync ./dist --stage hyperstructure --watch
 
 A camera swooping through an infinite warped lattice of fractal structures. Chromatic aberration splits the light. Energy rings orbit each cell. Data pulses flow along connecting beams. A generative drone soundtrack -- bass, sub, detuned pads, filtered noise, metallic ping echoes -- evolves in sync with the visuals.
 
-Requires a GPU stage for hardware-accelerated encoding.
+Requires a GPU stage (`--gpu`) -- the shader runs 90-step raymarching with 3x chromatic aberration passes and a fractal SDF per pixel. Software rendering can't keep up.
