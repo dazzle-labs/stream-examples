@@ -122,9 +122,11 @@ emit_event() {
     dazzle stage event emit "$event_name" "$event_json" --stage "$DAZZLE_STAGE" &
   fi
   # Local bridge (always try, fails silently if not running)
+  local bridge_payload
+  bridge_payload=$(jq -nc --arg e "$event_name" --arg d "$event_json" '{event: $e, data: $d}')
   curl -s -X POST http://localhost:7777/event \
     -H 'Content-Type: application/json' \
-    -d "{\"event\":\"$event_name\",\"data\":$(echo "$event_json" | jq -c '.')}" \
+    -d "$bridge_payload" \
     2>/dev/null &
 }
 
