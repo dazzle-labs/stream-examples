@@ -817,6 +817,15 @@ export function App() {
     }
   }, [getEditsPerSecond, getTopWikis])
 
+  // Periodically reload the page to clear accumulated state
+  useEffect(() => {
+    const FOUR_HOURS = 4 * 60 * 60 * 1000
+    const id = setInterval(() => {
+      location.reload()
+    }, FOUR_HOURS)
+    return () => clearInterval(id)
+  }, [])
+
   useEffect(() => {
     const canvas = canvasRef.current
     if (!canvas) return
@@ -830,8 +839,12 @@ export function App() {
     ctx.fillStyle = '#060612'
     ctx.fillRect(0, 0, WIDTH, HEIGHT)
 
-    // Connect to Wikipedia SSE stream with automatic reconnection
+    // Connect to Wikipedia SSE stream with exponential backoff reconnection
     let currentSource: EventSource | null = null
+    let consecutiveFailures = 0
+    let reconnectTimer: ReturnType<typeof setTimeout> | null = null
+    const MAX_BACKOFF_MS = 30_000
+    const MAX_CONSECUTIVE_FAILURES = 25
 
     const connectStream = () => {
       if (currentSource) {
@@ -840,6 +853,8 @@ export function App() {
       const es = new EventSource('https://stream.wikimedia.org/v2/stream/recentchange')
 
       es.onmessage = (messageEvent: MessageEvent<string>) => {
+        // Successful message resets the failure counter
+        consecutiveFailures = 0
         try {
           const data: unknown = JSON.parse(messageEvent.data)
           const event = parseWikiEvent(data)
@@ -853,8 +868,17 @@ export function App() {
 
       es.onerror = () => {
         es.close()
-        // Reconnect after a brief delay
-        setTimeout(connectStream, 2000)
+        consecutiveFailures++
+
+        // If we've failed too many times in a row, hard reload the page
+        if (consecutiveFailures >= MAX_CONSECUTIVE_FAILURES) {
+          location.reload()
+          return
+        }
+
+        // Exponential backoff: 2s, 4s, 8s, 16s, capped at 30s
+        const delay = Math.min(2000 * Math.pow(2, consecutiveFailures - 1), MAX_BACKOFF_MS)
+        reconnectTimer = setTimeout(connectStream, delay)
       }
 
       currentSource = es
@@ -884,6 +908,9 @@ export function App() {
     return () => {
       if (currentSource) {
         currentSource.close()
+      }
+      if (reconnectTimer) {
+        clearTimeout(reconnectTimer)
       }
       cancelAnimationFrame(state.animationId)
     }
