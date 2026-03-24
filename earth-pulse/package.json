@@ -1,0 +1,23 @@
+{
+  "name": "earth-pulse",
+  "version": "1.0.0",
+  "description": "A living globe powered by real-time seismic and orbital data. Earthquakes ripple across the surface, the ISS traces its orbit, and the planet breathes — all rendered with WebGL shaders on a GPU stage.",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "react": "^19.2.4",
+    "react-dom": "^19.2.4"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "^4.2.2",
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react": "^6.0.1",
+    "tailwindcss": "^4.2.2",
+    "typescript": "^5.9.3",
+    "vite": "^8.0.1"
+  }
+}
