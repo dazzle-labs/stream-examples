@@ -125,8 +125,8 @@ let eqCount = 0
 
 // Simulated flights removed — only real data with extrapolation
 
-const realFlights: RealFlight[] = []
-// realFlights populated by OpenSky + adsb.one
+const globalFlights: RealFlight[] = []   // OpenSky — full worldwide snapshot
+const regionalFlights: RealFlight[] = [] // adsb.one — detailed regional data
 const OPENSKY_INTERVAL = 900_000 // every 15 min for global snapshot (budget: ~96 calls/day)
 const ADSBONE_INTERVAL = 10_000  // every 10s for visible region detail
 let currentViewLon = 0           // updated each frame for adsb.one targeting
@@ -367,9 +367,8 @@ async function fetchOpenSky(): Promise<void> {
     }
     // Only replace if we got a meaningful response
     if (fresh.length > 500) {
-      realFlights.length = 0
-      realFlights.push(...fresh)
-      // global snapshot loaded
+      globalFlights.length = 0
+      for (const f of fresh) globalFlights.push(f)
     }
   } catch {
     // OpenSky unavailable — keep using simulated flights
@@ -413,12 +412,13 @@ async function fetchAdsbOne(): Promise<void> {
     if (!d.ac || d.ac.length < 10) return
 
     const now = Date.now()
-    // Add adsb.one flights — duplicates with OpenSky are harmless (same position, renders on top)
+    // Replace regional data entirely each poll (no accumulation)
+    regionalFlights.length = 0
     for (const ac of d.ac) {
       if (ac.lat == null || ac.lon == null || ac.gs == null || ac.track == null) continue
-      if (ac.alt_baro === 'ground' || ac.gs < 100) continue // skip ground/slow
+      if (ac.alt_baro === 'ground' || ac.gs < 100) continue
       if (Math.abs(ac.lat) > 78) continue
-      realFlights.push({
+      regionalFlights.push({
         lat: ac.lat,
         lon: ac.lon,
         heading: ac.track,
@@ -426,14 +426,6 @@ async function fetchAdsbOne(): Promise<void> {
         fetchedAt: now,
       })
     }
-
-    // Cap to prevent unbounded growth from repeated adsb.one additions
-    if (realFlights.length > 15000) {
-      // Remove oldest entries (by fetchedAt)
-      realFlights.sort((a, b) => b.fetchedAt - a.fetchedAt)
-      realFlights.length = 12000
-    }
-    // regional data merged
   } catch { /* retry next interval */ }
 }
 
@@ -796,14 +788,16 @@ export function EarthPulse() {
     }
     const brightBins: VisibleFlight[][] = [[], [], [], []]
 
-    // Real flights only — extrapolate positions from last known data
-    for (const f of realFlights) {
-      const [lat, lon, heading] = extrapolateFlight(f, now)
+    // Real flights only — render global + regional, extrapolate from last known data
+    const allFlights = globalFlights.length > 0 ? globalFlights : regionalFlights
+    for (const f of allFlights) {
+      const realNow = Date.now()
+      const [lat, lon, heading] = extrapolateFlight(f, realNow)
       if (Math.abs(lat) > 78) continue
       const [x, y, vis, cosC] = ortho(lat, lon, cLon)
       if (!vis) continue
 
-      const [tLat, tLon] = extrapolateFlight(f, now - 3000)
+      const [tLat, tLon] = extrapolateFlight(f, realNow - 3000)
       const [tx, ty, tVis] = ortho(tLat, tLon, cLon)
 
       const angleRad = -(heading - 90) * DEG
@@ -1231,7 +1225,7 @@ export function EarthPulse() {
       setEventLine(eventLog[0] ?? 'Monitoring...')
       setCount(eqCount)
       setWxTotal(wxCount)
-      setFlightCount(realFlights.length)
+      setFlightCount(globalFlights.length + regionalFlights.length)
     }, 1000)
     return () => clearInterval(id)
   }, [])
