@@ -1,0 +1,84 @@
+@import 'tailwindcss';
+
+@theme {
+  --color-navy: #0a0e1a;
+  --color-navy-light: #111729;
+  --color-amber: #f5a623;
+  --color-amber-dim: #f5a62366;
+  --color-cyan: #00e5ff;
+  --color-cyan-dim: #00e5ff44;
+  --color-alert: #ff4444;
+  --color-panel: #0d1225;
+  --color-panel-border: #1a2340;
+  --font-mono: 'IBM Plex Mono', monospace;
+  --font-sans: 'IBM Plex Sans', sans-serif;
+}
+
+body {
+  font-family: var(--font-sans);
+  background: var(--color-navy);
+  color: white;
+}
+
+@keyframes flicker {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.97; }
+  75% { opacity: 0.99; }
+}
+
+@keyframes scanline {
+  0% { background-position: 0 0; }
+  100% { background-position: 0 4px; }
+}
+
+@keyframes pulse-glow-amber {
+  0%, 100% { text-shadow: 0 0 20px #f5a62355, 0 0 40px #f5a62322; }
+  50% { text-shadow: 0 0 35px #f5a62388, 0 0 70px #f5a62344; }
+}
+
+@keyframes pulse-glow-cyan {
+  0%, 100% { text-shadow: 0 0 20px #00e5ff44, 0 0 40px #00e5ff22; }
+  50% { text-shadow: 0 0 35px #00e5ff66, 0 0 70px #00e5ff33; }
+}
+
+@keyframes pulse-dot {
+  0%, 100% { opacity: 1; box-shadow: 0 0 4px currentColor; }
+  50% { opacity: 0.5; box-shadow: 0 0 8px currentColor; }
+}
+
+@keyframes digit-cell-pulse {
+  0%, 100% { border-color: rgba(245, 166, 35, 0.15); }
+  50% { border-color: rgba(245, 166, 35, 0.3); }
+}
+
+.countdown-glow {
+  animation: pulse-glow-amber 2s ease-in-out infinite;
+}
+
+.countdown-glow-cyan {
+  animation: pulse-glow-cyan 2s ease-in-out infinite;
+}
+
+.telemetry-flicker {
+  animation: flicker 0.1s ease-in-out infinite;
+}
+
+.pulse-dot {
+  animation: pulse-dot 1.5s ease-in-out infinite;
+}
+
+.digit-cell {
+  animation: digit-cell-pulse 2s ease-in-out infinite;
+}
+
+.scanline-overlay {
+  background: repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 2px,
+    rgba(0, 0, 0, 0.03) 2px,
+    rgba(0, 0, 0, 0.03) 4px
+  );
+  animation: scanline 0.5s linear infinite;
+  pointer-events: none;
+}
