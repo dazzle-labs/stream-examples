@@ -1,0 +1,29 @@
+@import 'tailwindcss';
+
+@theme {
+  --color-bg: #050a14;
+  --color-ocean-dark: #080e1c;
+  --color-coast: #1a2a3a;
+  --color-text: #8ca0b8;
+  --color-text-dim: #3a5068;
+  --color-accent: #00aaff;
+  --font-mono: 'IBM Plex Mono', 'SF Mono', Consolas, monospace;
+}
+
+body {
+  font-family: var(--font-mono);
+  background: var(--color-bg);
+  color: var(--color-text);
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+}
+
+@keyframes breathe {
+  0%, 100% { opacity: 0.6; }
+  50% { opacity: 1; }
+}
+
+.animate-breathe {
+  animation: breathe 4s ease-in-out infinite;
+}

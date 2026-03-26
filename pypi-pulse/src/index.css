@@ -1,0 +1,22 @@
+@import 'tailwindcss';
+
+@theme {
+  --color-bg: #050508;
+  --color-text: #c8d8e8;
+  --color-text-dim: #3a4a5a;
+  --font-sans: 'Outfit', system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', 'SF Mono', monospace;
+}
+
+body {
+  font-family: var(--font-sans);
+  background: var(--color-bg);
+  color: var(--color-text);
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+}
+
+canvas {
+  display: block;
+}

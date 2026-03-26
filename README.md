@@ -14,6 +14,8 @@ Runnable examples for [Dazzle](https://dazzle.fm) -- cloud stages that render an
 - **[`artemis-ii`](./artemis-ii)** -- Real-time countdown and orbital mechanics for the Artemis II mission. Retro mission-control aesthetic.
 - **[`solar-storm`](./solar-storm)** -- Real-time space weather visualization. Aurora, lightning, and solar wind driven by live NOAA data.
 - **[`particle-life`](./particle-life)** -- Emergent artificial life. 4,000 particles with asymmetric attraction rules produce complex behavior.
+- **[`pypi-pulse`](./pypi-pulse)** -- Live PyPI package releases visualized as orbital comets launching from a central nexus. Driven by the PyPI RSS feed.
+- **[`ocean-pulse`](./ocean-pulse)** -- Real-time ocean monitoring. 600+ NOAA buoy stations with wave height, water temperature, and wind data on a bioluminescent map.
 
 ## Quick Start
 
