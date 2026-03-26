@@ -779,12 +779,12 @@ export function OceanPulse() {
     ctx.fillText(stats.lastUpdate, W - SAFE, H - SAFE + 10)
     ctx.textAlign = 'left'
 
-    // ─── Legend panel (bottom-right) ──────────────────────────
+    // ─── Legend panel (center-left, inland Great Plains) ───────
     // All legends grouped in a single panel, sized for TV readability
     const panelW = 340
     const panelH = 150
-    const panelX = W - SAFE - panelW
-    const panelY = H - SAFE - panelH - 10
+    const panelX = 550 - panelW / 2
+    const panelY = 360 - panelH / 2
 
     // Panel background with subtle border
     ctx.fillStyle = 'rgba(5, 10, 20, 0.75)'
