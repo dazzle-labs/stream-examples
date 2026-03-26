@@ -10,6 +10,10 @@ Runnable examples for [Dazzle](https://dazzle.fm) -- cloud stages that render an
 - **[`remotion-stream`](./remotion-stream)** -- Motion graphics with [Remotion](https://remotion.dev). Deterministic, frame-perfect animation.
 - **[`claude-code-stream`](./claude-code-stream)** -- Live visualization of a Claude Code session. Every tool call on stream in real time.
 - **[`hyperstructure`](./hyperstructure)** -- Raymarched fractal lattice with procedural audio. Pure GPU shader + generative drone. Requires a GPU stage.
+- **[`earth-pulse`](./earth-pulse)** -- Living globe powered by real-time seismic and orbital data. Earthquakes and ISS orbit on a rotating Earth.
+- **[`artemis-ii`](./artemis-ii)** -- Real-time countdown and orbital mechanics for the Artemis II mission. Retro mission-control aesthetic.
+- **[`solar-storm`](./solar-storm)** -- Real-time space weather visualization. Aurora, lightning, and solar wind driven by live NOAA data.
+- **[`particle-life`](./particle-life)** -- Emergent artificial life. 4,000 particles with asymmetric attraction rules produce complex behavior.
 
 ## Quick Start
 
