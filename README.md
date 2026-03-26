@@ -16,6 +16,7 @@ Runnable examples for [Dazzle](https://dazzle.fm) -- cloud stages that render an
 - **[`particle-life`](./particle-life)** -- Emergent artificial life. 4,000 particles with asymmetric attraction rules produce complex behavior.
 - **[`pypi-pulse`](./pypi-pulse)** -- Live PyPI package releases visualized as orbital comets launching from a central nexus. Driven by the PyPI RSS feed.
 - **[`ocean-pulse`](./ocean-pulse)** -- Real-time ocean monitoring. 600+ NOAA buoy stations with wave height, water temperature, and wind data on a bioluminescent map.
+- **[`bluesky-pulse`](./bluesky-pulse)** -- Live Bluesky firehose visualization. Trending hashtag bubbles, language-coded particle stream, and real-time stats powered by the Jetstream API.
 
 ## Quick Start
 

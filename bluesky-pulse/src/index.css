@@ -1,0 +1,72 @@
+@import 'tailwindcss';
+
+@theme {
+  --color-bg: #06080c;
+  --color-bg-card: #0a0e14;
+  --color-bg-card-hover: #0e1320;
+  --color-accent: #0085ff;
+  --color-accent-dim: #0065cc;
+  --color-text: #e8ecf2;
+  --color-text-muted: #6b7a8d;
+  --color-text-dim: #3a4656;
+  --color-border: rgba(255, 255, 255, 0.06);
+  --color-border-accent: rgba(0, 133, 255, 0.2);
+
+  --color-lang-en: #4a9eff;
+  --color-lang-ja: #ff6b9d;
+  --color-lang-pt: #4ade80;
+  --color-lang-es: #fbbf24;
+  --color-lang-de: #e2e8f0;
+  --color-lang-other: #a78bfa;
+
+  --font-display: 'Outfit', sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html, body, #root {
+  width: 1280px;
+  height: 720px;
+  overflow: hidden;
+  background: var(--color-bg);
+  color: var(--color-text);
+  font-family: var(--font-mono);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+@keyframes pulse-glow {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+
+@keyframes fade-in {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+.animate-pulse-glow {
+  animation: pulse-glow 2s ease-in-out infinite;
+}
+
+.animate-fade-in {
+  animation: fade-in 0.6s ease-out forwards;
+}
+
+.font-display {
+  font-family: var(--font-display);
+}
+
+.font-mono {
+  font-family: var(--font-mono);
+}
