@@ -42,7 +42,7 @@ export function BlueskyPulse() {
 
   return (
     <div
-      className="flex w-[1280px] h-[720px] overflow-hidden relative"
+      className="flex w-screen h-screen overflow-hidden relative"
       style={{ background: '#06080c' }}
     >
       {/* Subtle vignette overlay */}
@@ -55,30 +55,30 @@ export function BlueskyPulse() {
       />
 
       {/* Left zone: The Stream */}
-      <div className="relative w-[350px] h-[720px] flex-shrink-0">
+      <div className="relative w-[350px] h-full flex-shrink-0">
         <StreamZone ref={streamRef} stats={stats} />
       </div>
 
       {/* Subtle divider */}
       <div
-        className="w-px h-[720px] flex-shrink-0"
+        className="w-px h-full flex-shrink-0"
         style={{ background: 'linear-gradient(to bottom, transparent, rgba(0,133,255,0.15) 30%, rgba(0,133,255,0.15) 70%, transparent)' }}
       />
 
       {/* Center zone: Trending Gravity */}
-      <div className="relative flex-1 h-[720px]">
+      <div className="relative flex-1 h-full min-w-0">
         <TrendingZone ref={trendingRef} stats={stats} />
       </div>
 
       {/* Subtle divider */}
       <div
-        className="w-px h-[720px] flex-shrink-0"
+        className="w-px h-full flex-shrink-0"
         style={{ background: 'linear-gradient(to bottom, transparent, rgba(0,133,255,0.15) 30%, rgba(0,133,255,0.15) 70%, transparent)' }}
       />
 
       {/* Right zone: The Dashboard */}
       <div
-        className="relative w-[400px] h-[720px] flex-shrink-0"
+        className="relative w-[360px] h-full flex-shrink-0 overflow-hidden"
         style={{
           background: 'linear-gradient(135deg, rgba(10, 14, 20, 0.8) 0%, rgba(6, 8, 12, 0.95) 100%)',
         }}

@@ -1,28 +1,17 @@
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef } from 'react'
-import type { ParsedEvent, FirehoseStats } from './firehose'
+import type { ParsedEvent, FirehoseStats, EventKind } from './firehose'
+import { useContainerSize } from './useContainerSize'
 
 interface StreamParticle {
   x: number
   y: number
-  vx: number
   vy: number
-  radius: number
-  color: string
-  alpha: number
+  kind: EventKind
+  size: number
   life: number
   maxLife: number
-  hasImages: boolean
-  shimmerPhase: number
-}
-
-interface AmbientMote {
-  x: number
-  y: number
-  vy: number
-  radius: number
-  alpha: number
-  phase: number
-  color: string
+  opacity: number
+  drift: number
 }
 
 interface TextOverlay {
@@ -34,32 +23,109 @@ interface TextOverlay {
   maxLife: number
 }
 
-const LANGUAGE_COLORS: Record<string, string> = {
-  en: '#4a9eff',
-  ja: '#ff6b9d',
-  pt: '#4ade80',
-  es: '#fbbf24',
-  de: '#e2e8f0',
-  other: '#a78bfa',
+interface EventStyle {
+  color: string
+  minSize: number
+  maxSize: number
+  draw: (ctx: CanvasRenderingContext2D, x: number, y: number, size: number, alpha: number) => void
 }
 
-const ALL_COLORS = Object.values(LANGUAGE_COLORS)
-const MAX_PARTICLES = 200
-const MAX_AMBIENT_MOTES = 40
-const MAX_TEXT_OVERLAYS = 2
-const TEXT_OVERLAY_INTERVAL = 4000
-const TEXT_OVERLAY_DURATION = 4000
-const PARTICLE_SAMPLE_RATE = 40
+// Twitter/X SVG paths (24x24 viewBox) — created once for performance
+const HEART_PATH = new Path2D('M16.697 5.5c-1.222-.06-2.679.51-3.89 2.16l-.805 1.09-.806-1.09C9.984 6.01 8.526 5.44 7.304 5.5c-1.243.07-2.349.78-2.91 1.91-.552 1.12-.633 2.78.479 4.82 1.074 1.97 3.257 4.27 7.129 6.61 3.87-2.34 6.052-4.64 7.126-6.61 1.111-2.04 1.03-3.7.477-4.82-.561-1.13-1.666-1.84-2.908-1.91zm4.187 7.69c-1.351 2.48-4.001 5.12-8.379 7.67l-.503.3-.504-.3c-4.379-2.55-7.029-5.19-8.382-7.67-1.36-2.5-1.41-4.86-.514-6.67.887-1.79 2.647-2.91 4.601-3.01 1.651-.09 3.368.56 4.798 2.01 1.429-1.45 3.146-2.1 4.796-2.01 1.954.1 3.714 1.22 4.601 3.01.896 1.81.846 4.17-.514 6.67z')
+const REPLY_PATH = new Path2D('M1.751 10c0-4.42 3.584-8 8.005-8h4.366c4.49 0 8.129 3.64 8.129 8.13 0 2.96-1.607 5.68-4.196 7.11l-8.054 4.46v-3.69h-.067c-4.49.1-8.183-3.51-8.183-8.01zm8.005-6c-3.317 0-6.005 2.69-6.005 6 0 3.37 2.77 6.08 6.138 6.01l.351-.01h1.761v2.3l5.087-2.81c1.951-1.08 3.163-3.13 3.163-5.36 0-3.39-2.744-6.13-6.129-6.13H9.756z')
+const REPOST_PATH = new Path2D('M4.5 3.88l4.432 4.14-1.364 1.46L5.5 7.55V16c0 1.1.896 2 2 2H13v2H7.5c-2.209 0-4-1.79-4-4V7.55L1.432 9.48.068 8.02 4.5 3.88zM16.5 6H11V4h5.5c2.209 0 4 1.79 4 4v8.45l2.068-1.93 1.364 1.46-4.432 4.14-4.432-4.14 1.364-1.46 2.068 1.93V8c0-1.1-.896-2-2-2z')
 
-function getParticleRadius(kind: ParsedEvent['kind']): number {
-  switch (kind) {
-    case 'post': return 3.5 + Math.random() * 1.5
-    case 'reply': return 2 + Math.random() * 1
-    case 'repost': return 1.2 + Math.random() * 0.6
-    case 'like': return 0.8 + Math.random() * 0.5
-    case 'follow': return 1 + Math.random() * 0.5
-  }
+function drawHeart(ctx: CanvasRenderingContext2D, x: number, y: number, size: number, alpha: number): void {
+  const scale = size / 24
+  ctx.save()
+  ctx.translate(x - size / 2, y - size / 2)
+  ctx.scale(scale, scale)
+  ctx.fillStyle = `rgba(255, 107, 138, ${alpha})`
+  ctx.fill(HEART_PATH)
+  ctx.restore()
 }
+
+function drawReply(ctx: CanvasRenderingContext2D, x: number, y: number, size: number, alpha: number): void {
+  const scale = size / 24
+  ctx.save()
+  ctx.translate(x - size / 2, y - size / 2)
+  ctx.scale(scale, scale)
+  ctx.fillStyle = `rgba(74, 158, 255, ${alpha})`
+  ctx.fill(REPLY_PATH)
+  ctx.restore()
+}
+
+function drawRepost(ctx: CanvasRenderingContext2D, x: number, y: number, size: number, alpha: number): void {
+  const scale = size / 24
+  ctx.save()
+  ctx.translate(x - size / 2, y - size / 2)
+  ctx.scale(scale, scale)
+  ctx.fillStyle = `rgba(74, 222, 128, ${alpha})`
+  ctx.fill(REPOST_PATH)
+  ctx.restore()
+}
+
+function drawPost(ctx: CanvasRenderingContext2D, x: number, y: number, size: number, alpha: number): void {
+  const s = size * 0.4
+  const scale = s / 12
+  ctx.save()
+  ctx.translate(x - s, y - s)
+  ctx.scale(scale, scale)
+  // Diagonal pen nib shape
+  ctx.beginPath()
+  ctx.moveTo(18, 2)
+  ctx.lineTo(22, 6)
+  ctx.lineTo(8, 20)
+  ctx.lineTo(2, 22)
+  ctx.lineTo(4, 16)
+  ctx.closePath()
+  ctx.fillStyle = `rgba(74, 158, 255, ${alpha})`
+  ctx.fill()
+  // Pen collar line
+  ctx.beginPath()
+  ctx.moveTo(15, 5)
+  ctx.lineTo(19, 9)
+  ctx.lineWidth = 1.2
+  ctx.strokeStyle = `rgba(30, 80, 160, ${alpha})`
+  ctx.stroke()
+  ctx.restore()
+}
+
+function drawFollow(ctx: CanvasRenderingContext2D, x: number, y: number, size: number, alpha: number): void {
+  const s = size * 0.45
+  ctx.save()
+  ctx.fillStyle = `rgba(167, 139, 250, ${alpha})`
+  // Head circle
+  ctx.beginPath()
+  ctx.arc(x - s * 0.15, y - s * 0.4, s * 0.32, 0, Math.PI * 2)
+  ctx.fill()
+  // Body/shoulders arc
+  ctx.beginPath()
+  ctx.ellipse(x - s * 0.15, y + s * 0.55, s * 0.5, s * 0.35, 0, Math.PI, 0)
+  ctx.fill()
+  // Plus sign to the right
+  const px = x + s * 0.65
+  const py = y - s * 0.05
+  const ps = s * 0.25
+  const pw = s * 0.1
+  ctx.fillRect(px - ps, py - pw / 2, ps * 2, pw)
+  ctx.fillRect(px - pw / 2, py - ps, pw, ps * 2)
+  ctx.restore()
+}
+
+const EVENT_STYLES: Record<EventKind, EventStyle> = {
+  like: { color: '#ff6b8a', minSize: 10, maxSize: 14, draw: drawHeart },
+  post: { color: '#4a9eff', minSize: 16, maxSize: 20, draw: drawPost },
+  reply: { color: '#4a9eff', minSize: 12, maxSize: 16, draw: drawReply },
+  repost: { color: '#4ade80', minSize: 12, maxSize: 16, draw: drawRepost },
+  follow: { color: '#a78bfa', minSize: 13, maxSize: 17, draw: drawFollow },
+}
+
+const MAX_PARTICLES = 250
+const MAX_TEXT_OVERLAYS = 6
+const TEXT_OVERLAY_INTERVAL = 1100
+const TEXT_OVERLAY_DURATION = 7000
+const PARTICLE_SAMPLE_RATE = 60
 
 export const StreamZone = forwardRef<
   { addEvent: (event: ParsedEvent) => void },
@@ -67,13 +133,14 @@ export const StreamZone = forwardRef<
 >(function StreamZone({ stats: _stats }, ref) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const particlesRef = useRef<StreamParticle[]>([])
-  const ambientMotesRef = useRef<AmbientMote[]>([])
   const textOverlaysRef = useRef<TextOverlay[]>([])
   const eventQueueRef = useRef<ParsedEvent[]>([])
   const lastParticleTimeRef = useRef(0)
   const lastTextTimeRef = useRef(0)
   const animFrameRef = useRef(0)
   const lastFrameTimeRef = useRef(0)
+  const sizeRef = useRef({ w: 350, h: 720 })
+  const [containerRef, containerSize] = useContainerSize()
 
   const addEvent = useCallback((event: ParsedEvent) => {
     const queue = eventQueueRef.current
@@ -84,6 +151,26 @@ export const StreamZone = forwardRef<
 
   useImperativeHandle(ref, () => ({ addEvent }), [addEvent])
 
+  // Resize canvas backing store when container changes
+  useEffect(() => {
+    const canvas = canvasRef.current
+    if (!canvas || containerSize.width === 0 || containerSize.height === 0) return
+
+    const dpr = Math.min(window.devicePixelRatio || 1, 1.5)
+    const W = containerSize.width
+    const H = containerSize.height
+
+    canvas.width = Math.round(W * dpr)
+    canvas.height = Math.round(H * dpr)
+
+    const ctx = canvas.getContext('2d')
+    if (ctx) {
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
+    }
+
+    sizeRef.current = { w: W, h: H }
+  }, [containerSize.width, containerSize.height])
+
   useEffect(() => {
     const canvas = canvasRef.current
     if (!canvas) return
@@ -91,55 +178,53 @@ export const StreamZone = forwardRef<
     const ctx = canvas.getContext('2d')
     if (!ctx) return
 
-    const W = 350
-    const H = 720
-
-    canvas.width = W * 2
-    canvas.height = H * 2
-    ctx.scale(2, 2)
-
-    // Initialize ambient motes - always-visible background particles
-    const motes = ambientMotesRef.current
-    for (let i = 0; i < MAX_AMBIENT_MOTES; i++) {
-      motes.push({
-        x: 40 + Math.random() * (W - 80),
-        y: Math.random() * H,
-        vy: 0.2 + Math.random() * 0.5,
-        radius: 0.3 + Math.random() * 1.2,
-        alpha: 0.05 + Math.random() * 0.15,
-        phase: Math.random() * Math.PI * 2,
-        color: ALL_COLORS[Math.floor(Math.random() * ALL_COLORS.length)] ?? '#4a9eff',
-      })
-    }
+    // Initial sizing
+    const dpr = Math.min(window.devicePixelRatio || 1, 1.5)
+    const initW = containerSize.width || 350
+    const initH = containerSize.height || 720
+    canvas.width = Math.round(initW * dpr)
+    canvas.height = Math.round(initH * dpr)
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
+    sizeRef.current = { w: initW, h: initH }
 
     function spawnParticle(event: ParsedEvent): void {
+      const { w: W } = sizeRef.current
       const particles = particlesRef.current
       if (particles.length >= MAX_PARTICLES) {
         particles.shift()
       }
 
-      const color = LANGUAGE_COLORS[event.language] ?? LANGUAGE_COLORS['other'] ?? '#a78bfa'
-      const radius = getParticleRadius(event.kind)
+      const style = EVENT_STYLES[event.kind]
+      const size = style.minSize + Math.random() * (style.maxSize - style.minSize)
       const xCenter = W / 2
-      const xSpread = 130
+      const xSpread = Math.min(130, W * 0.37)
       const x = xCenter + (Math.random() - 0.5) * xSpread + Math.sin(Date.now() * 0.001 + Math.random() * 6.28) * 25
+
+      const { h: H } = sizeRef.current
+      const vy = 1.0 + Math.random() * 1.8
+      // maxLife must be long enough for the particle to traverse from its
+      // spawn point (up to y = -30) past the bottom removal threshold
+      // (H + 20). Total distance is H + 50. Each frame is ~16.67ms and
+      // the particle moves ~vy CSS pixels per frame. Multiply by 1.3 so
+      // the fade-out (which starts at 85% of life) doesn't kill it early.
+      const traversalMs = ((H + 50) / vy) * 16.67
+      const lifeMs = traversalMs * 1.3 + 500
 
       particles.push({
         x,
         y: -10 - Math.random() * 20,
-        vx: (Math.random() - 0.5) * 0.4,
-        vy: 1.0 + Math.random() * 1.8,
-        radius,
-        color,
-        alpha: 0.6 + Math.random() * 0.4,
+        vy,
+        kind: event.kind,
+        size,
         life: 0,
-        maxLife: 350 + Math.random() * 250,
-        hasImages: event.hasImages,
-        shimmerPhase: Math.random() * Math.PI * 2,
+        maxLife: lifeMs,
+        opacity: 0.6 + Math.random() * 0.4,
+        drift: Math.random() * Math.PI * 2,
       })
     }
 
     function spawnTextOverlay(event: ParsedEvent): void {
+      const { h: H } = sizeRef.current
       const overlays = textOverlaysRef.current
       if (overlays.length >= MAX_TEXT_OVERLAYS) return
 
@@ -148,10 +233,40 @@ export const StreamZone = forwardRef<
         displayText = displayText.slice(0, 117) + '...'
       }
 
+      // Divide the usable vertical space into zones and find a gap
+      const topMargin = 80
+      const bottomMargin = 60
+      const overlayHeight = 90 // approximate height of a text overlay box
+      const usableTop = topMargin
+      const usableBottom = H - bottomMargin
+      const usableHeight = usableBottom - usableTop
+
+      // Create candidate zones by dividing vertical space
+      const zoneCount = MAX_TEXT_OVERLAYS + 1
+      const zoneHeight = usableHeight / zoneCount
+      const candidateYs: number[] = []
+      for (let z = 0; z < zoneCount; z++) {
+        candidateYs.push(usableTop + z * zoneHeight + (zoneHeight - overlayHeight) / 2)
+      }
+
+      // Filter out candidates that would collide with existing overlays
+      const occupiedYs = overlays.map(o => o.y)
+      const freeYs = candidateYs.filter(cy => {
+        for (const oy of occupiedYs) {
+          if (Math.abs(cy - oy) < overlayHeight + 12) return false
+        }
+        return true
+      })
+
+      if (freeYs.length === 0) return
+
+      // Pick a random free zone
+      const y = freeYs[Math.floor(Math.random() * freeYs.length)] ?? freeYs[0] ?? usableTop
+
       overlays.push({
         text: displayText,
         x: 24,
-        y: 120 + Math.random() * 440,
+        y,
         alpha: 0,
         life: 0,
         maxLife: TEXT_OVERLAY_DURATION,
@@ -191,73 +306,38 @@ export const StreamZone = forwardRef<
 
       if (!ctx) return
 
+      const { w: W, h: H } = sizeRef.current
+
       processQueue(timestamp)
 
-      // Clear with trail effect for that glowing persistence
-      ctx.fillStyle = 'rgba(6, 8, 12, 0.14)'
+      // Solid dark background each frame — no trail/motion blur
+      const dpr = Math.min(window.devicePixelRatio || 1, 1.5)
+      ctx.clearRect(0, 0, W * dpr, H * dpr)
+      ctx.fillStyle = '#06080c'
       ctx.fillRect(0, 0, W, H)
-
-      // Ambient glow at top (source of the stream)
-      const topGlow = ctx.createRadialGradient(W / 2, -30, 0, W / 2, -30, 200)
-      topGlow.addColorStop(0, 'rgba(0, 133, 255, 0.04)')
-      topGlow.addColorStop(0.5, 'rgba(74, 158, 255, 0.015)')
-      topGlow.addColorStop(1, 'transparent')
-      ctx.fillStyle = topGlow
-      ctx.fillRect(0, 0, W, 220)
-
-      // Subtle vertical flow lines (light streaks)
-      const flowTime = timestamp * 0.0003
-      for (let i = 0; i < 5; i++) {
-        const fx = 80 + i * 50 + Math.sin(flowTime + i * 1.3) * 30
-        const flowGrad = ctx.createLinearGradient(fx, 0, fx, H)
-        flowGrad.addColorStop(0, 'rgba(0, 133, 255, 0.008)')
-        flowGrad.addColorStop(0.3, 'rgba(0, 133, 255, 0.015)')
-        flowGrad.addColorStop(0.7, 'rgba(0, 133, 255, 0.008)')
-        flowGrad.addColorStop(1, 'transparent')
-        ctx.fillStyle = flowGrad
-        ctx.fillRect(fx - 15, 0, 30, H)
-      }
 
       const dtFactor = dt / 16.67
 
-      // Draw ambient motes (always visible background particles)
-      for (const mote of motes) {
-        mote.y += mote.vy * dtFactor
-        mote.phase += 0.01 * dtFactor
-        mote.x += Math.sin(mote.phase) * 0.15 * dtFactor
-
-        if (mote.y > H + 10) {
-          mote.y = -10
-          mote.x = 40 + Math.random() * (W - 80)
-        }
-
-        ctx.beginPath()
-        ctx.arc(mote.x, mote.y, mote.radius, 0, Math.PI * 2)
-        ctx.fillStyle = colorWithAlpha(mote.color, mote.alpha)
-        ctx.fill()
-      }
-
-      // Update and draw stream particles
+      // Update and draw stream particles as canvas icons
       const particles = particlesRef.current
       for (let i = particles.length - 1; i >= 0; i--) {
         const p = particles[i]
         if (!p) continue
 
         p.life += dt
-        p.x += p.vx * dtFactor
         p.y += p.vy * dtFactor
 
         // Gentle organic drift
-        p.x += Math.sin(p.life * 0.002 + p.shimmerPhase) * 0.2 * dtFactor
-        p.x += Math.cos(p.life * 0.0008 + p.shimmerPhase * 2) * 0.1 * dtFactor
+        p.x += Math.sin(p.life * 0.002 + p.drift) * 0.2 * dtFactor
+        p.x += Math.cos(p.life * 0.0008 + p.drift * 2) * 0.1 * dtFactor
 
-        // Fade in/out
+        // Fade in/out — late fade-out so icons stay visible most of the fall
         const lifeRatio = p.life / p.maxLife
-        let fadeAlpha = p.alpha
+        let fadeAlpha = p.opacity
         if (lifeRatio < 0.08) {
           fadeAlpha *= lifeRatio / 0.08
-        } else if (lifeRatio > 0.65) {
-          fadeAlpha *= 1 - (lifeRatio - 0.65) / 0.35
+        } else if (lifeRatio > 0.85) {
+          fadeAlpha *= 1 - (lifeRatio - 0.85) / 0.15
         }
 
         if (p.life > p.maxLife || p.y > H + 20) {
@@ -265,38 +345,11 @@ export const StreamZone = forwardRef<
           continue
         }
 
-        // Outer glow
-        const glowSize = p.radius * 5
-        const glowGrad = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, glowSize)
-        glowGrad.addColorStop(0, colorWithAlpha(p.color, fadeAlpha * 0.25))
-        glowGrad.addColorStop(0.4, colorWithAlpha(p.color, fadeAlpha * 0.08))
-        glowGrad.addColorStop(1, 'transparent')
-        ctx.fillStyle = glowGrad
-        ctx.fillRect(p.x - glowSize, p.y - glowSize, glowSize * 2, glowSize * 2)
-
-        // Core particle
-        ctx.beginPath()
-        ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2)
-        ctx.fillStyle = colorWithAlpha(p.color, fadeAlpha * 0.9)
-        ctx.fill()
-
-        // Hot white center
-        ctx.beginPath()
-        ctx.arc(p.x, p.y, p.radius * 0.35, 0, Math.PI * 2)
-        ctx.fillStyle = colorWithAlpha('#ffffff', fadeAlpha * 0.5)
-        ctx.fill()
-
-        // Golden shimmer for posts with images
-        if (p.hasImages) {
-          const shimmerAlpha = (Math.sin(p.life * 0.008 + p.shimmerPhase) * 0.5 + 0.5) * fadeAlpha * 0.4
-          const shimSize = p.radius * 7
-          const shimGrad = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, shimSize)
-          shimGrad.addColorStop(0, colorWithAlpha('#fbbf24', shimmerAlpha * 0.6))
-          shimGrad.addColorStop(0.5, colorWithAlpha('#fbbf24', shimmerAlpha * 0.15))
-          shimGrad.addColorStop(1, 'transparent')
-          ctx.fillStyle = shimGrad
-          ctx.fillRect(p.x - shimSize, p.y - shimSize, shimSize * 2, shimSize * 2)
-        }
+        // Render canvas-drawn icon — clean outline style
+        ctx.save()
+        ctx.globalAlpha = 1
+        EVENT_STYLES[p.kind].draw(ctx, p.x, p.y, p.size, fadeAlpha)
+        ctx.restore()
       }
 
       // Draw text overlays
@@ -350,15 +403,15 @@ export const StreamZone = forwardRef<
         const bgHeight = lines.length * lineHeight + padding * 2
         const bgWidth = maxWidth + padding * 2
 
-        // Frosted glass background
-        ctx.fillStyle = 'rgba(6, 8, 12, 0.8)'
+        // Solid dark background for readability over icon waterfall
+        ctx.fillStyle = 'rgba(10, 14, 20, 0.97)'
         ctx.beginPath()
         roundRect(ctx, overlay.x - padding, overlay.y - padding, bgWidth, bgHeight, 8)
         ctx.fill()
 
-        // Accent border
-        ctx.strokeStyle = 'rgba(0, 133, 255, 0.15)'
-        ctx.lineWidth = 0.5
+        // Subtle visible border
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.12)'
+        ctx.lineWidth = 1
         ctx.beginPath()
         roundRect(ctx, overlay.x - padding, overlay.y - padding, bgWidth, bgHeight, 8)
         ctx.stroke()
@@ -367,8 +420,8 @@ export const StreamZone = forwardRef<
         ctx.fillStyle = 'rgba(0, 133, 255, 0.3)'
         ctx.fillRect(overlay.x - padding, overlay.y - padding + 4, 2, bgHeight - 8)
 
-        // Text
-        ctx.fillStyle = 'rgba(232, 236, 242, 0.85)'
+        // Text — bright for readability
+        ctx.fillStyle = 'rgba(240, 244, 250, 0.95)'
         ctx.font = '11.5px "Outfit", sans-serif'
         for (let li = 0; li < lines.length; li++) {
           const line = lines[li]
@@ -382,11 +435,33 @@ export const StreamZone = forwardRef<
 
       // "THE STREAM" label at top
       ctx.save()
-      ctx.globalAlpha = 0.25
-      ctx.font = '600 9px "JetBrains Mono", monospace'
-      ctx.fillStyle = '#6b7a8d'
       ctx.textAlign = 'center'
-      ctx.fillText('THE STREAM', W / 2, 20)
+      ctx.font = '700 14px "JetBrains Mono", monospace'
+
+      // Apply letter-spacing uniformly across all passes
+      ctx.letterSpacing = '3px'
+
+      // Multi-layer glow for depth and contrast
+      ctx.shadowColor = 'rgba(0, 133, 255, 0.8)'
+      ctx.shadowBlur = 20
+      ctx.globalAlpha = 0.6
+      ctx.fillStyle = '#4a9eff'
+      ctx.fillText('THE STREAM', W / 2, 24)
+
+      // Second pass: tighter glow for sharpness
+      ctx.shadowColor = 'rgba(0, 133, 255, 0.5)'
+      ctx.shadowBlur = 8
+      ctx.globalAlpha = 0.85
+      ctx.fillStyle = '#c8ddf5'
+      ctx.fillText('THE STREAM', W / 2, 24)
+
+      // Third pass: crisp white-ish text on top, no shadow
+      ctx.shadowColor = 'transparent'
+      ctx.shadowBlur = 0
+      ctx.globalAlpha = 0.95
+      ctx.fillStyle = '#e2eaf4'
+      ctx.fillText('THE STREAM', W / 2, 24)
+
       ctx.restore()
 
       animFrameRef.current = requestAnimationFrame(render)
@@ -397,23 +472,18 @@ export const StreamZone = forwardRef<
     return () => {
       cancelAnimationFrame(animFrameRef.current)
     }
-  }, [])
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
-    <canvas
-      ref={canvasRef}
-      className="w-[350px] h-[720px]"
-      style={{ display: 'block' }}
-    />
+    <div ref={containerRef} className="w-full h-full">
+      <canvas
+        ref={canvasRef}
+        className="w-full h-full"
+        style={{ display: 'block' }}
+      />
+    </div>
   )
 })
-
-function colorWithAlpha(hex: string, alpha: number): string {
-  const r = parseInt(hex.slice(1, 3), 16)
-  const g = parseInt(hex.slice(3, 5), 16)
-  const b = parseInt(hex.slice(5, 7), 16)
-  return `rgba(${r},${g},${b},${Math.max(0, Math.min(1, alpha))})`
-}
 
 function roundRect(
   ctx: CanvasRenderingContext2D,

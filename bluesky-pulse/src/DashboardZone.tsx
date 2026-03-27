@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import type { FirehoseStats, ParsedEvent } from './firehose'
 
 const LANGUAGE_COLORS: Record<string, string> = {
@@ -17,21 +17,6 @@ const LANGUAGE_LABELS: Record<string, string> = {
   es: 'Spanish',
   de: 'German',
   other: 'Other',
-}
-
-function formatNumber(n: number): string {
-  if (n >= 1_000_000) return (n / 1_000_000).toFixed(1) + 'M'
-  if (n >= 1_000) return (n / 1_000).toFixed(1) + 'K'
-  return String(n)
-}
-
-function formatUptime(seconds: number): string {
-  const h = Math.floor(seconds / 3600)
-  const m = Math.floor((seconds % 3600) / 60)
-  const s = seconds % 60
-  if (h > 0) return `${h}h ${m}m ${s}s`
-  if (m > 0) return `${m}m ${s}s`
-  return `${s}s`
 }
 
 function Sparkline({ data, width, height }: { data: number[]; width: number; height: number }) {
@@ -149,7 +134,7 @@ function ActivityBar({ stats }: { stats: FirehoseStats }) {
           />
         ))}
       </div>
-      <div className="flex justify-between mt-1.5">
+      <div className="flex justify-between" style={{ marginTop: '8px' }}>
         {segments.map((seg) => (
           <div key={seg.label} className="flex items-center gap-1">
             <div className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: seg.color, opacity: 0.7 }} />
@@ -178,14 +163,14 @@ function LanguageBars({ languageCounts }: { languageCounts: Map<string, number> 
     .slice(0, 6)
 
   return (
-    <div className="flex flex-col gap-1.5">
+    <div className="flex flex-col" style={{ gap: '4px' }}>
       {sorted.map(([lang, count]) => {
         const pct = (count / total) * 100
         const color = LANGUAGE_COLORS[lang] ?? LANGUAGE_COLORS['other'] ?? '#a78bfa'
         const label = LANGUAGE_LABELS[lang] ?? lang
         return (
-          <div key={lang} className="flex items-center gap-2">
-            <span className="font-mono text-[9px] w-[52px] text-right" style={{ color: '#6b7a8d' }}>
+          <div key={lang} className="flex items-center gap-2 pr-2 overflow-hidden">
+            <span className="font-mono text-[9px] w-[52px] text-right flex-shrink-0" style={{ color: '#6b7a8d' }}>
               {label}
             </span>
             <div className="flex-1 h-2 rounded-full" style={{ background: 'rgba(255,255,255,0.05)' }}>
@@ -199,7 +184,7 @@ function LanguageBars({ languageCounts }: { languageCounts: Map<string, number> 
                 }}
               />
             </div>
-            <span className="font-mono text-[9px] w-[30px]" style={{ color: '#6b7a8d' }}>
+            <span className="font-mono text-[9px] w-[34px] text-right flex-shrink-0" style={{ color: '#6b7a8d' }}>
               {pct.toFixed(0)}%
             </span>
           </div>
@@ -209,83 +194,165 @@ function LanguageBars({ languageCounts }: { languageCounts: Map<string, number> 
   )
 }
 
-function FeaturedPost({ posts }: { posts: ParsedEvent[] }) {
-  const [currentPost, setCurrentPost] = useState<ParsedEvent | null>(null)
-  const [opacity, setOpacity] = useState(0)
-  const indexRef = useRef(0)
+interface FeedPost {
+  id: string
+  event: ParsedEvent
+  age: number // 0 = newest, increments as posts push down
+}
+
+const MAX_FEED_POSTS = 6
+const FEED_INTERVAL_MS = 2500
+
+function truncateText(text: string, max: number): string {
+  const trimmed = text.trim()
+  if (trimmed.length <= max) return trimmed
+  return trimmed.slice(0, max - 3) + '...'
+}
+
+function LiveFeed({ posts, trendingTag }: { posts: ParsedEvent[]; trendingTag: string | undefined }) {
+  const [feedPosts, setFeedPosts] = useState<FeedPost[]>([])
+  const nextIdRef = useRef(0)
+  const lastPickedIndexRef = useRef(-1)
+  const postsRef = useRef<ParsedEvent[]>(posts)
+  const trendingTagRef = useRef<string | undefined>(trendingTag)
+
+  // Keep refs in sync with latest props without restarting the interval
+  useEffect(() => {
+    postsRef.current = posts
+  }, [posts])
 
   useEffect(() => {
-    if (posts.length === 0) return
+    trendingTagRef.current = trendingTag
+    // Clear feed when trending topic changes so stale posts don't linger
+    setFeedPosts([])
+    lastPickedIndexRef.current = -1
+  }, [trendingTag])
 
+  useEffect(() => {
     const interval = setInterval(() => {
-      // Fade out
-      setOpacity(0)
+      const currentPosts = postsRef.current
+      if (currentPosts.length === 0) return
 
-      setTimeout(() => {
-        // Pick an interesting post
-        const interestingPosts = posts.filter(
-          (p) => p.text.length > 40 && (p.hashtags.length > 0 || p.language === 'en'),
-        )
-        const pool = interestingPosts.length > 0 ? interestingPosts : posts
-        const idx = indexRef.current % pool.length
-        const post = pool[idx]
-        if (post) {
-          setCurrentPost(post)
-        }
-        indexRef.current++
-        setOpacity(1)
-      }, 400)
-    }, 8000)
+      const currentTag = trendingTagRef.current
 
-    // Show first post immediately
-    if (!currentPost && posts.length > 0) {
-      const first = posts[posts.length - 1]
-      if (first) {
-        setCurrentPost(first)
-        setOpacity(1)
-      }
-    }
+      // ONLY show posts matching the current top trending hashtag
+      // Check both hashtags array AND post text (case-insensitive)
+      const tagLower = currentTag?.toLowerCase()
+      if (!tagLower) return
+
+      const pool = currentPosts.filter(
+        (p) => p.text.length > 15 && (
+          p.hashtags.some((h) => h.toLowerCase() === tagLower) ||
+          p.text.toLowerCase().includes(tagLower)
+        ),
+      )
+
+      if (pool.length === 0) return
+
+      // Cycle through available posts
+      lastPickedIndexRef.current = (lastPickedIndexRef.current + 1) % pool.length
+      const picked = pool[lastPickedIndexRef.current]
+      if (!picked) return
+
+      const newId = `feed-${nextIdRef.current++}`
+
+      setFeedPosts((prev) => {
+        // Age all existing posts, add new one at age 0
+        const aged = prev.map((p) => ({ ...p, age: p.age + 1 }))
+        const updated: FeedPost[] = [{ id: newId, event: picked, age: 0 }, ...aged]
+        // Keep only the max visible
+        return updated.slice(0, MAX_FEED_POSTS)
+      })
+    }, FEED_INTERVAL_MS)
 
     return () => clearInterval(interval)
-  }, [posts, currentPost])
+  }, [])
 
-  if (!currentPost) {
+  if (feedPosts.length === 0) {
     return (
       <div className="text-[10px] font-mono" style={{ color: '#3a4656' }}>
-        Listening...
+        Listening for posts...
       </div>
     )
   }
 
-  const langColor = LANGUAGE_COLORS[currentPost.language] ?? LANGUAGE_COLORS['other'] ?? '#a78bfa'
-  let displayText = currentPost.text.trim()
-  if (displayText.length > 140) {
-    displayText = displayText.slice(0, 137) + '...'
-  }
-
   return (
     <div
-      className="transition-opacity duration-400"
-      style={{ opacity }}
+      className="flex flex-col gap-3 overflow-hidden"
+      style={{ flex: 1 }}
     >
-      <div
-        className="rounded-lg p-3"
-        style={{
-          background: 'rgba(255, 255, 255, 0.03)',
-          border: '1px solid rgba(255, 255, 255, 0.06)',
-        }}
-      >
-        <div className="flex items-center gap-2 mb-2">
-          <div className="w-2 h-2 rounded-full" style={{ backgroundColor: langColor }} />
-          <span className="font-mono text-[9px]" style={{ color: '#6b7a8d' }}>
-            {LANGUAGE_LABELS[currentPost.language] ?? currentPost.language}
-            {currentPost.hashtags.length > 0 && ` \u00b7 #${currentPost.hashtags[0]}`}
-          </span>
-        </div>
-        <p className="font-display text-[12px] leading-[1.5]" style={{ color: 'rgba(232, 236, 242, 0.8)' }}>
-          {displayText}
-        </p>
-      </div>
+      {feedPosts.map((post) => {
+        const langColor = LANGUAGE_COLORS[post.event.language] ?? LANGUAGE_COLORS['other'] ?? '#a78bfa'
+        const langLabel = LANGUAGE_LABELS[post.event.language] ?? post.event.language
+        const displayText = truncateText(post.event.text, 120)
+        const isNewest = post.age === 0
+
+        // Staggered opacity: newest fully opaque, oldest fades out
+        const baseOpacity = Math.max(0.2, 1 - post.age * 0.15)
+
+        return (
+          <div
+            key={post.id}
+            style={{
+              opacity: baseOpacity,
+              transform: isNewest ? 'translateY(0) scale(1)' : 'translateY(0) scale(1)',
+              transition: 'all 0.4s cubic-bezier(0.16, 1, 0.3, 1)',
+              animation: isNewest ? 'feed-slide-in 0.4s cubic-bezier(0.16, 1, 0.3, 1)' : undefined,
+            }}
+          >
+            <div
+              className="rounded-lg overflow-hidden"
+              style={{
+                padding: '7px 10px',
+                background: isNewest
+                  ? 'rgba(0, 133, 255, 0.12)'
+                  : 'rgba(255, 255, 255, 0.06)',
+                border: isNewest
+                  ? '1px solid rgba(0, 133, 255, 0.30)'
+                  : '1px solid rgba(255, 255, 255, 0.10)',
+                boxShadow: isNewest
+                  ? '0 0 12px rgba(0, 133, 255, 0.1), inset 0 1px 0 rgba(255, 255, 255, 0.06)'
+                  : 'inset 0 1px 0 rgba(255, 255, 255, 0.04)',
+              }}
+            >
+              <div className="flex items-center gap-1.5 mb-2 overflow-hidden">
+                <div
+                  className="w-1.5 h-1.5 rounded-full flex-shrink-0"
+                  style={{
+                    backgroundColor: langColor,
+                    boxShadow: isNewest ? `0 0 6px ${langColor}` : 'none',
+                  }}
+                />
+                <span className="font-mono text-[8px] truncate" style={{ color: '#6b7a8d' }}>
+                  {langLabel}
+                  {post.event.hashtags.length > 0 && ` \u00b7 #${post.event.hashtags[0]}`}
+                </span>
+              </div>
+              <p
+                className="font-display text-[13px] leading-[1.4] overflow-hidden line-clamp-2"
+                style={{
+                  color: isNewest ? 'rgba(232, 236, 242, 0.9)' : 'rgba(232, 236, 242, 0.65)',
+                }}
+              >
+                {displayText}
+              </p>
+            </div>
+          </div>
+        )
+      })}
+
+      <style>{`
+        @keyframes feed-slide-in {
+          0% {
+            opacity: 0;
+            transform: translateY(-16px) scale(0.95);
+          }
+          100% {
+            opacity: 1;
+            transform: translateY(0) scale(1);
+          }
+        }
+      `}</style>
     </div>
   )
 }
@@ -297,14 +364,33 @@ export function DashboardZone({ stats }: { stats: FirehoseStats }) {
 
   const topTag = topTrending[0]
 
+  // Shared section label style — industrial data dashboard aesthetic
+  const sectionLabelStyle: React.CSSProperties = {
+    color: '#6b7a8d',
+    fontSize: '11px',
+    letterSpacing: '0.08em',
+    marginBottom: '8px',
+  }
+
+  // Shared divider style — thin rule between major sections
+  const dividerStyle: React.CSSProperties = {
+    height: '1px',
+    background: 'rgba(255, 255, 255, 0.06)',
+    marginTop: '12px',
+    marginBottom: '12px',
+  }
+
   return (
-    <div className="h-full flex flex-col px-5 py-5 overflow-hidden">
+    <div
+      className="h-full flex flex-col overflow-hidden"
+      style={{ padding: '24px 22px' }}
+    >
       {/* Title */}
-      <div className="flex items-center justify-between mb-4">
+      <div className="flex items-center justify-between" style={{ marginBottom: '18px' }}>
         <h1 className="font-display text-[22px] font-bold tracking-tight" style={{ color: '#e8ecf2' }}>
           BLUESKY PULSE
         </h1>
-        <div className="flex items-center gap-1.5 flex-shrink-0">
+        <div className="flex items-center gap-1.5 flex-shrink-0 mr-2">
           <div
             className="w-2 h-2 rounded-full flex-shrink-0"
             style={{
@@ -321,12 +407,12 @@ export function DashboardZone({ stats }: { stats: FirehoseStats }) {
         </div>
       </div>
 
-      {/* Thin separator */}
-      <div className="h-px mb-4" style={{ background: 'rgba(255,255,255,0.06)' }} />
+      {/* Thin separator after title */}
+      <div style={{ height: '1px', background: 'rgba(255,255,255,0.06)', marginBottom: '20px' }} />
 
       {/* Events per second - hero number */}
-      <div className="mb-3">
-        <div className="font-mono text-[10px] font-medium mb-1" style={{ color: '#6b7a8d' }}>
+      <div style={{ marginBottom: '8px' }}>
+        <div className="font-mono font-medium" style={{ ...sectionLabelStyle, marginBottom: '6px' }}>
           EVENTS / SECOND
         </div>
         <div className="flex items-end gap-3">
@@ -336,45 +422,54 @@ export function DashboardZone({ stats }: { stats: FirehoseStats }) {
           >
             {stats.eventsPerSecond}
           </span>
-          <span className="font-mono text-[11px] mb-1" style={{ color: '#3a4656' }}>
+          <span className="font-mono text-[11px]" style={{ color: '#3a4656', marginBottom: '4px' }}>
             evt/s
           </span>
         </div>
       </div>
 
-      {/* Sparkline */}
-      <div className="mb-4">
-        <Sparkline data={stats.sparkline} width={350} height={40} />
-        <div className="flex justify-between mt-0.5">
+      {/* Sparkline — generous bottom margin for hero section breathing room */}
+      <div className="overflow-hidden" style={{ marginBottom: '16px' }}>
+        <Sparkline data={stats.sparkline} width={300} height={40} />
+        <div className="flex justify-between" style={{ marginTop: '3px' }}>
           <span className="font-mono text-[8px]" style={{ color: '#3a4656' }}>60s ago</span>
           <span className="font-mono text-[8px]" style={{ color: '#3a4656' }}>now</span>
         </div>
       </div>
 
+      {/* Divider: sparkline -> activity */}
+      <div style={dividerStyle} />
+
       {/* Activity breakdown */}
-      <div className="mb-4">
-        <div className="font-mono text-[10px] font-medium mb-2" style={{ color: '#6b7a8d' }}>
+      <div style={{ marginBottom: '4px' }}>
+        <div className="font-mono font-medium" style={sectionLabelStyle}>
           ACTIVITY
         </div>
         <ActivityBar stats={stats} />
       </div>
 
+      {/* Divider: activity -> languages */}
+      <div style={dividerStyle} />
+
       {/* Language distribution */}
-      <div className="mb-4">
-        <div className="font-mono text-[10px] font-medium mb-2" style={{ color: '#6b7a8d' }}>
+      <div style={{ marginBottom: '4px' }}>
+        <div className="font-mono font-medium" style={sectionLabelStyle}>
           LANGUAGES
         </div>
         <LanguageBars languageCounts={stats.languageCounts} />
       </div>
 
+      {/* Divider: languages -> top trending */}
+      <div style={dividerStyle} />
+
       {/* Top trending */}
-      <div className="mb-4">
-        <div className="font-mono text-[10px] font-medium mb-1.5" style={{ color: '#6b7a8d' }}>
+      <div style={{ marginBottom: '4px' }}>
+        <div className="font-mono font-medium" style={sectionLabelStyle}>
           TOP TRENDING
         </div>
         {topTag ? (
-          <div className="flex items-baseline gap-2">
-            <span className="font-display text-[20px] font-bold" style={{ color: '#0085ff' }}>
+          <div className="flex items-baseline gap-2 overflow-hidden">
+            <span className="font-display text-[22px] font-bold truncate" style={{ color: '#0085ff' }}>
               #{topTag[0]}
             </span>
             <span className="font-mono text-[11px]" style={{ color: '#6b7a8d' }}>
@@ -388,33 +483,11 @@ export function DashboardZone({ stats }: { stats: FirehoseStats }) {
         )}
       </div>
 
-      {/* Featured post */}
-      <div className="mb-4 flex-1 min-h-0">
-        <div className="font-mono text-[10px] font-medium mb-2" style={{ color: '#6b7a8d' }}>
-          SAMPLE POST
-        </div>
-        <FeaturedPost posts={stats.recentPosts} />
+      {/* Live feed — fills remaining vertical space, contextually related to top trending */}
+      <div className="flex flex-col" style={{ flex: 1, minHeight: 0, marginTop: '12px' }}>
+        <LiveFeed posts={stats.recentPosts} trendingTag={topTag?.[0]} />
       </div>
 
-      {/* Connection stats footer */}
-      <div className="mt-auto pt-3" style={{ borderTop: '1px solid rgba(255,255,255,0.06)' }}>
-        <div className="flex justify-between">
-          <span className="font-mono text-[9px]" style={{ color: '#3a4656' }}>
-            {formatNumber(stats.totalEvents)} events processed
-          </span>
-          <span className="font-mono text-[9px]" style={{ color: '#3a4656' }}>
-            uptime {formatUptime(stats.uptimeSeconds)}
-          </span>
-        </div>
-        <div className="flex justify-between mt-0.5">
-          <span className="font-mono text-[9px]" style={{ color: '#3a4656' }}>
-            ~{(stats.eventsPerSecond * 0.5).toFixed(0)} KB/s
-          </span>
-          <span className="font-mono text-[9px]" style={{ color: '#3a4656' }}>
-            {formatNumber(stats.postCount + stats.replyCount)} posts
-          </span>
-        </div>
-      </div>
     </div>
   )
 }
