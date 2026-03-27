@@ -662,14 +662,33 @@ export const TrendingZone = forwardRef<
         ctx.restore()
       }
 
-      // ── Zone header ───────────────────────────────────────────────────
+      // ── Zone header (matches THE STREAM styling) ──────────────────────
       ctx.save()
-      ctx.globalAlpha = 0.25
-      ctx.font = `600 ${9 * s}px "JetBrains Mono", monospace`
-      ctx.fillStyle = '#607890'
+      ctx.font = '700 14px "JetBrains Mono", monospace'
       ctx.textAlign = 'center'
-      ctx.letterSpacing = `${3 * s}px`
-      ctx.fillText('TRENDING', cx, 22 * s)
+      ctx.letterSpacing = '3px'
+
+      // Pass 1: outer blue glow
+      ctx.globalAlpha = 0.6
+      ctx.fillStyle = '#4a9eff'
+      ctx.shadowColor = 'rgba(0, 133, 255, 0.8)'
+      ctx.shadowBlur = 20
+      ctx.fillText('TRENDING', cx, 24)
+
+      // Pass 2: mid glow
+      ctx.globalAlpha = 0.85
+      ctx.fillStyle = '#c8ddf5'
+      ctx.shadowColor = 'rgba(0, 133, 255, 0.5)'
+      ctx.shadowBlur = 8
+      ctx.fillText('TRENDING', cx, 24)
+
+      // Pass 3: crisp top layer
+      ctx.globalAlpha = 0.95
+      ctx.fillStyle = '#e2eaf4'
+      ctx.shadowColor = 'transparent'
+      ctx.shadowBlur = 0
+      ctx.fillText('TRENDING', cx, 24)
+
       ctx.restore()
 
       // ── Stats bar at the bottom ────────────────────────────────────

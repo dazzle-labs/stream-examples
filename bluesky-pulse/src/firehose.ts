@@ -301,7 +301,7 @@ export function createFirehose(onEvent: EventCallback, onStats: StatsCallback): 
     }
 
     onStats(stats)
-  }, 250)
+  }, 500)
 
   // Batch incoming WebSocket messages to avoid overwhelming the main thread
   let messageBuffer: string[] = []

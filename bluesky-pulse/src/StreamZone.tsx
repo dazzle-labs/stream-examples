@@ -27,7 +27,6 @@ interface EventStyle {
   color: string
   minSize: number
   maxSize: number
-  draw: (ctx: CanvasRenderingContext2D, x: number, y: number, size: number, alpha: number) => void
 }
 
 // Twitter/X SVG paths (24x24 viewBox) — created once for performance
@@ -35,97 +34,128 @@ const HEART_PATH = new Path2D('M16.697 5.5c-1.222-.06-2.679.51-3.89 2.16l-.805 1
 const REPLY_PATH = new Path2D('M1.751 10c0-4.42 3.584-8 8.005-8h4.366c4.49 0 8.129 3.64 8.129 8.13 0 2.96-1.607 5.68-4.196 7.11l-8.054 4.46v-3.69h-.067c-4.49.1-8.183-3.51-8.183-8.01zm8.005-6c-3.317 0-6.005 2.69-6.005 6 0 3.37 2.77 6.08 6.138 6.01l.351-.01h1.761v2.3l5.087-2.81c1.951-1.08 3.163-3.13 3.163-5.36 0-3.39-2.744-6.13-6.129-6.13H9.756z')
 const REPOST_PATH = new Path2D('M4.5 3.88l4.432 4.14-1.364 1.46L5.5 7.55V16c0 1.1.896 2 2 2H13v2H7.5c-2.209 0-4-1.79-4-4V7.55L1.432 9.48.068 8.02 4.5 3.88zM16.5 6H11V4h5.5c2.209 0 4 1.79 4 4v8.45l2.068-1.93 1.364 1.46-4.432 4.14-4.432-4.14 1.364-1.46 2.068 1.93V8c0-1.1-.896-2-2-2z')
 
-function drawHeart(ctx: CanvasRenderingContext2D, x: number, y: number, size: number, alpha: number): void {
-  const scale = size / 24
-  ctx.save()
-  ctx.translate(x - size / 2, y - size / 2)
-  ctx.scale(scale, scale)
-  ctx.fillStyle = `rgba(255, 107, 138, ${alpha})`
-  ctx.fill(HEART_PATH)
-  ctx.restore()
+// ── Pre-rendered icon cache ──────────────────────────────────────────────
+// Instead of calling ctx.fill(Path2D) with save/translate/scale/restore per
+// particle every frame, we pre-render each icon kind at discrete sizes to
+// offscreen canvases. Each frame becomes a single ctx.drawImage() blit,
+// which is significantly faster at 180 particles per frame.
+
+const iconCache = new Map<string, HTMLCanvasElement>()
+
+function roundToStep(value: number, step: number): number {
+  return Math.round(value / step) * step
 }
 
-function drawReply(ctx: CanvasRenderingContext2D, x: number, y: number, size: number, alpha: number): void {
-  const scale = size / 24
-  ctx.save()
-  ctx.translate(x - size / 2, y - size / 2)
-  ctx.scale(scale, scale)
-  ctx.fillStyle = `rgba(74, 158, 255, ${alpha})`
-  ctx.fill(REPLY_PATH)
-  ctx.restore()
-}
+function getOrCreateIcon(kind: EventKind, size: number): HTMLCanvasElement {
+  // Snap to nearest 2px to limit cache entries
+  const snapped = Math.max(4, roundToStep(size, 2))
+  const key = `${kind}-${snapped}`
+  const cached = iconCache.get(key)
+  if (cached) return cached
 
-function drawRepost(ctx: CanvasRenderingContext2D, x: number, y: number, size: number, alpha: number): void {
-  const scale = size / 24
-  ctx.save()
-  ctx.translate(x - size / 2, y - size / 2)
-  ctx.scale(scale, scale)
-  ctx.fillStyle = `rgba(74, 222, 128, ${alpha})`
-  ctx.fill(REPOST_PATH)
-  ctx.restore()
-}
+  const canvas = document.createElement('canvas')
+  // Render at 2x for crispness on high-DPI
+  const px = snapped * 2
+  canvas.width = px
+  canvas.height = px
+  const ctx = canvas.getContext('2d')
+  if (!ctx) return canvas
 
-function drawPost(ctx: CanvasRenderingContext2D, x: number, y: number, size: number, alpha: number): void {
-  const s = size * 0.4
-  const scale = s / 12
-  ctx.save()
-  ctx.translate(x - s, y - s)
-  ctx.scale(scale, scale)
-  // Diagonal pen nib shape
-  ctx.beginPath()
-  ctx.moveTo(18, 2)
-  ctx.lineTo(22, 6)
-  ctx.lineTo(8, 20)
-  ctx.lineTo(2, 22)
-  ctx.lineTo(4, 16)
-  ctx.closePath()
-  ctx.fillStyle = `rgba(74, 158, 255, ${alpha})`
-  ctx.fill()
-  // Pen collar line
-  ctx.beginPath()
-  ctx.moveTo(15, 5)
-  ctx.lineTo(19, 9)
-  ctx.lineWidth = 1.2
-  ctx.strokeStyle = `rgba(30, 80, 160, ${alpha})`
-  ctx.stroke()
-  ctx.restore()
-}
+  ctx.scale(2, 2)
 
-function drawFollow(ctx: CanvasRenderingContext2D, x: number, y: number, size: number, alpha: number): void {
-  const s = size * 0.45
-  ctx.save()
-  ctx.fillStyle = `rgba(167, 139, 250, ${alpha})`
-  // Head circle
-  ctx.beginPath()
-  ctx.arc(x - s * 0.15, y - s * 0.4, s * 0.32, 0, Math.PI * 2)
-  ctx.fill()
-  // Body/shoulders arc
-  ctx.beginPath()
-  ctx.ellipse(x - s * 0.15, y + s * 0.55, s * 0.5, s * 0.35, 0, Math.PI, 0)
-  ctx.fill()
-  // Plus sign to the right
-  const px = x + s * 0.65
-  const py = y - s * 0.05
-  const ps = s * 0.25
-  const pw = s * 0.1
-  ctx.fillRect(px - ps, py - pw / 2, ps * 2, pw)
-  ctx.fillRect(px - pw / 2, py - ps, pw, ps * 2)
-  ctx.restore()
+  switch (kind) {
+    case 'like': {
+      const scale = snapped / 24
+      ctx.save()
+      ctx.scale(scale, scale)
+      ctx.fillStyle = 'rgb(255, 107, 138)'
+      ctx.fill(HEART_PATH)
+      ctx.restore()
+      break
+    }
+    case 'reply': {
+      const scale = snapped / 24
+      ctx.save()
+      ctx.scale(scale, scale)
+      ctx.fillStyle = 'rgb(74, 158, 255)'
+      ctx.fill(REPLY_PATH)
+      ctx.restore()
+      break
+    }
+    case 'repost': {
+      const scale = snapped / 24
+      ctx.save()
+      ctx.scale(scale, scale)
+      ctx.fillStyle = 'rgb(74, 222, 128)'
+      ctx.fill(REPOST_PATH)
+      ctx.restore()
+      break
+    }
+    case 'post': {
+      const s = snapped * 0.4
+      const scale = s / 12
+      ctx.save()
+      // Offset by half the canvas (snapped/2) to center the icon
+      ctx.translate(snapped / 2 - s, snapped / 2 - s)
+      ctx.scale(scale, scale)
+      ctx.beginPath()
+      ctx.moveTo(18, 2)
+      ctx.lineTo(22, 6)
+      ctx.lineTo(8, 20)
+      ctx.lineTo(2, 22)
+      ctx.lineTo(4, 16)
+      ctx.closePath()
+      ctx.fillStyle = 'rgb(74, 158, 255)'
+      ctx.fill()
+      ctx.beginPath()
+      ctx.moveTo(15, 5)
+      ctx.lineTo(19, 9)
+      ctx.lineWidth = 1.2
+      ctx.strokeStyle = 'rgb(30, 80, 160)'
+      ctx.stroke()
+      ctx.restore()
+      break
+    }
+    case 'follow': {
+      const s = snapped * 0.45
+      const cx = snapped / 2
+      const cy = snapped / 2
+      ctx.save()
+      ctx.fillStyle = 'rgb(167, 139, 250)'
+      ctx.beginPath()
+      ctx.arc(cx - s * 0.15, cy - s * 0.4, s * 0.32, 0, Math.PI * 2)
+      ctx.fill()
+      ctx.beginPath()
+      ctx.ellipse(cx - s * 0.15, cy + s * 0.55, s * 0.5, s * 0.35, 0, Math.PI, 0)
+      ctx.fill()
+      const px = cx + s * 0.65
+      const py = cy - s * 0.05
+      const ps = s * 0.25
+      const pw = s * 0.1
+      ctx.fillRect(px - ps, py - pw / 2, ps * 2, pw)
+      ctx.fillRect(px - pw / 2, py - ps, pw, ps * 2)
+      ctx.restore()
+      break
+    }
+  }
+
+  iconCache.set(key, canvas)
+  return canvas
 }
 
 const EVENT_STYLES: Record<EventKind, EventStyle> = {
-  like: { color: '#ff6b8a', minSize: 10, maxSize: 14, draw: drawHeart },
-  post: { color: '#4a9eff', minSize: 16, maxSize: 20, draw: drawPost },
-  reply: { color: '#4a9eff', minSize: 12, maxSize: 16, draw: drawReply },
-  repost: { color: '#4ade80', minSize: 12, maxSize: 16, draw: drawRepost },
-  follow: { color: '#a78bfa', minSize: 13, maxSize: 17, draw: drawFollow },
+  like: { color: '#ff6b8a', minSize: 10, maxSize: 14 },
+  post: { color: '#4a9eff', minSize: 16, maxSize: 20 },
+  reply: { color: '#4a9eff', minSize: 12, maxSize: 16 },
+  repost: { color: '#4ade80', minSize: 12, maxSize: 16 },
+  follow: { color: '#a78bfa', minSize: 13, maxSize: 17 },
 }
 
-const MAX_PARTICLES = 250
+const MAX_PARTICLES = 180
 const MAX_TEXT_OVERLAYS = 6
 const TEXT_OVERLAY_INTERVAL = 1100
 const TEXT_OVERLAY_DURATION = 7000
-const PARTICLE_SAMPLE_RATE = 60
+const PARTICLE_SAMPLE_RATE = 45
 
 export const StreamZone = forwardRef<
   { addEvent: (event: ParsedEvent) => void },
@@ -345,11 +375,13 @@ export const StreamZone = forwardRef<
           continue
         }
 
-        // Render canvas-drawn icon — clean outline style
-        ctx.save()
+        // Blit pre-rendered icon from cache — much faster than
+        // save/translate/scale/fill(Path2D)/restore per particle
+        const icon = getOrCreateIcon(p.kind, p.size)
+        ctx.globalAlpha = fadeAlpha
+        const halfSize = p.size / 2
+        ctx.drawImage(icon, 0, 0, icon.width, icon.height, p.x - halfSize, p.y - halfSize, p.size, p.size)
         ctx.globalAlpha = 1
-        EVENT_STYLES[p.kind].draw(ctx, p.x, p.y, p.size, fadeAlpha)
-        ctx.restore()
       }
 
       // Draw text overlays
@@ -377,7 +409,8 @@ export const StreamZone = forwardRef<
         ctx.save()
         ctx.globalAlpha = overlay.alpha * 0.9
 
-        ctx.font = '12px "Outfit", sans-serif'
+        // Use the SAME font for measuring and rendering
+        ctx.font = '500 13.5px "Outfit", sans-serif'
         ctx.fillStyle = '#e8ecf2'
 
         // Word wrap
@@ -398,31 +431,40 @@ export const StreamZone = forwardRef<
         }
         if (currentLine) lines.push(currentLine)
 
-        const lineHeight = 18
-        const padding = 10
+        const lineHeight = 21
+        const padding = 12
         const bgHeight = lines.length * lineHeight + padding * 2
         const bgWidth = maxWidth + padding * 2
 
-        // Solid dark background for readability over icon waterfall
+        // Draw background, border, and clip all content to the card bounds
+        const cardX = overlay.x - padding
+        const cardY = overlay.y - padding
+
+        // Background
         ctx.fillStyle = 'rgba(10, 14, 20, 0.97)'
         ctx.beginPath()
-        roundRect(ctx, overlay.x - padding, overlay.y - padding, bgWidth, bgHeight, 8)
+        roundRect(ctx, cardX, cardY, bgWidth, bgHeight, 8)
         ctx.fill()
 
-        // Subtle visible border
+        // Border
         ctx.strokeStyle = 'rgba(255, 255, 255, 0.12)'
         ctx.lineWidth = 1
         ctx.beginPath()
-        roundRect(ctx, overlay.x - padding, overlay.y - padding, bgWidth, bgHeight, 8)
+        roundRect(ctx, cardX, cardY, bgWidth, bgHeight, 8)
         ctx.stroke()
+
+        // Clip all subsequent draws to the card bounds — canvas overflow:hidden
+        ctx.beginPath()
+        roundRect(ctx, cardX, cardY, bgWidth, bgHeight, 8)
+        ctx.clip()
 
         // Left accent line
         ctx.fillStyle = 'rgba(0, 133, 255, 0.3)'
-        ctx.fillRect(overlay.x - padding, overlay.y - padding + 4, 2, bgHeight - 8)
+        ctx.fillRect(cardX, cardY + 4, 2, bgHeight - 8)
 
-        // Text — bright for readability
-        ctx.fillStyle = 'rgba(240, 244, 250, 0.95)'
-        ctx.font = '11.5px "Outfit", sans-serif'
+        // Text — clipped to card, so long URLs etc. won't bleed
+        ctx.fillStyle = 'rgba(245, 248, 255, 1)'
+        ctx.font = '500 13.5px "Outfit", sans-serif'
         for (let li = 0; li < lines.length; li++) {
           const line = lines[li]
           if (line !== undefined) {

@@ -31,8 +31,16 @@ export function BlueskyPulse() {
     trendingRef.current?.addEvent(event)
   }, [])
 
+  // Throttle React state updates — firehose emits every 250ms but we only
+  // need to re-render the dashboard at 500ms. The canvas zones read stats
+  // via refs so they're unaffected by this throttle.
+  const lastStatsUpdateRef = useRef(0)
   const handleStats = useCallback((newStats: FirehoseStats) => {
-    setStats(newStats)
+    const now = performance.now()
+    if (now - lastStatsUpdateRef.current >= 500) {
+      lastStatsUpdateRef.current = now
+      setStats(newStats)
+    }
   }, [])
 
   useEffect(() => {

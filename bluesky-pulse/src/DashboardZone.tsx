@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react'
+import React, { useEffect, useMemo, useRef, useState } from 'react'
 import type { FirehoseStats, ParsedEvent } from './firehose'
 
 const LANGUAGE_COLORS: Record<string, string> = {
@@ -19,7 +19,7 @@ const LANGUAGE_LABELS: Record<string, string> = {
   other: 'Other',
 }
 
-function Sparkline({ data, width, height }: { data: number[]; width: number; height: number }) {
+const Sparkline = React.memo(function Sparkline({ data, width, height }: { data: number[]; width: number; height: number }) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
 
   useEffect(() => {
@@ -106,17 +106,24 @@ function Sparkline({ data, width, height }: { data: number[]; width: number; hei
       style={{ width: `${width}px`, height: `${height}px` }}
     />
   )
+})
+
+interface ActivityBarProps {
+  postCount: number
+  replyCount: number
+  repostCount: number
+  likeCount: number
 }
 
-function ActivityBar({ stats }: { stats: FirehoseStats }) {
-  const total = stats.postCount + stats.replyCount + stats.repostCount + stats.likeCount
+const ActivityBar = React.memo(function ActivityBar({ postCount, replyCount, repostCount, likeCount }: ActivityBarProps) {
+  const total = postCount + replyCount + repostCount + likeCount
   if (total === 0) return <div className="h-3 rounded-full" style={{ background: 'rgba(255,255,255,0.05)' }} />
 
   const segments = [
-    { label: 'Posts', count: stats.postCount, color: '#4a9eff' },
-    { label: 'Replies', count: stats.replyCount, color: '#6b9dff' },
-    { label: 'Reposts', count: stats.repostCount, color: '#a78bfa' },
-    { label: 'Likes', count: stats.likeCount, color: '#ff6b9d' },
+    { label: 'Posts', count: postCount, color: '#4a9eff' },
+    { label: 'Replies', count: replyCount, color: '#6b9dff' },
+    { label: 'Reposts', count: repostCount, color: '#a78bfa' },
+    { label: 'Likes', count: likeCount, color: '#ff6b9d' },
   ]
 
   return (
@@ -146,9 +153,9 @@ function ActivityBar({ stats }: { stats: FirehoseStats }) {
       </div>
     </div>
   )
-}
+})
 
-function LanguageBars({ languageCounts }: { languageCounts: Map<string, number> }) {
+const LanguageBars = React.memo(function LanguageBars({ languageCounts }: { languageCounts: Map<string, number> }) {
   const total = [...languageCounts.values()].reduce((a, b) => a + b, 0)
   if (total === 0) {
     return (
@@ -192,7 +199,7 @@ function LanguageBars({ languageCounts }: { languageCounts: Map<string, number> 
       })}
     </div>
   )
-}
+})
 
 interface FeedPost {
   id: string
@@ -209,7 +216,7 @@ function truncateText(text: string, max: number): string {
   return trimmed.slice(0, max - 3) + '...'
 }
 
-function LiveFeed({ posts, trendingTag }: { posts: ParsedEvent[]; trendingTag: string | undefined }) {
+const LiveFeed = React.memo(function LiveFeed({ posts, trendingTag }: { posts: ParsedEvent[]; trendingTag: string | undefined }) {
   const [feedPosts, setFeedPosts] = useState<FeedPost[]>([])
   const nextIdRef = useRef(0)
   const lastPickedIndexRef = useRef(-1)
@@ -355,12 +362,18 @@ function LiveFeed({ posts, trendingTag }: { posts: ParsedEvent[]; trendingTag: s
       `}</style>
     </div>
   )
-}
+})
 
 export function DashboardZone({ stats }: { stats: FirehoseStats }) {
+  // Extract stable sub-values so memoized children only re-render when
+  // their specific data changes, not on every stats emission
+  const { postCount, replyCount, repostCount, likeCount } = stats
+
   // Get top trending hashtag
-  const topTrending = [...stats.hashtagCounts.entries()]
-    .sort((a, b) => b[1] - a[1])
+  const topTrending = useMemo(
+    () => [...stats.hashtagCounts.entries()].sort((a, b) => b[1] - a[1]),
+    [stats.hashtagCounts],
+  )
 
   const topTag = topTrending[0]
 
@@ -445,7 +458,7 @@ export function DashboardZone({ stats }: { stats: FirehoseStats }) {
         <div className="font-mono font-medium" style={sectionLabelStyle}>
           ACTIVITY
         </div>
-        <ActivityBar stats={stats} />
+        <ActivityBar postCount={postCount} replyCount={replyCount} repostCount={repostCount} likeCount={likeCount} />
       </div>
 
       {/* Divider: activity -> languages */}
