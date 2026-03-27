@@ -1,5 +1,4 @@
 import type { Era } from './types'
-import { TextDecode } from './TextDecode'
 
 type EraTransitionProps = {
   era: Era,
@@ -48,7 +47,7 @@ export function EraTransition({ era, eventCount }: EraTransitionProps) {
           fontFamily: era.titleFont,
         }}
       >
-        <TextDecode text={era.name} duration={1500} />
+        {era.name}
       </div>
 
       <div
