@@ -1,0 +1,28 @@
+{
+  "name": "ai-vtuber",
+  "version": "1.0.0",
+  "description": "AI VTuber live stream: a 3D anime character powered by Claude with Kokoro TTS, rendered with @pixiv/three-vrm. Event-driven dialogue with idle fallback, natural animations, lip-sync, and cinematic subtitles.",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -p tsconfig.app.json && vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@pixiv/three-vrm": "^3.4.5",
+    "@pixiv/three-vrm-animation": "^3.5.1",
+    "kokoro-js": "^1.2.1",
+    "react": "^19.2.4",
+    "react-dom": "^19.2.4",
+    "three": "^0.172.0"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "^4.2.2",
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.3",
+    "@types/three": "^0.172.0",
+    "@vitejs/plugin-react": "^6.0.1",
+    "tailwindcss": "^4.2.2",
+    "typescript": "^5.9.3",
+    "vite": "^8.0.1"
+  }
+}
