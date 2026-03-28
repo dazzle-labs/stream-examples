@@ -30,10 +30,12 @@ GPU stage required for VRM rendering + Kokoro TTS (WebGPU).
 
 | Variable | Description | Default |
 |----------|-------------|---------|
-| `VITE_VRM_MODEL_URL` | URL or local path to a VRM model | three-vrm sample from GitHub |
-| `VITE_ANTHROPIC_API_KEY` | Anthropic API key for AI conversation | Built-in idle phrases |
+| `VITE_VRM_MODEL_URL` | URL or local path to a VRM model | CC0 sample from GitHub |
+| `VITE_LLM_API_KEY` | API key for AI conversation (OpenRouter, OpenAI, etc.) | Built-in idle phrases |
+| `VITE_LLM_API_BASE` | Base URL for the chat completions API | `https://openrouter.ai/api/v1` |
+| `VITE_LLM_MODEL` | Model identifier | `anthropic/claude-haiku-4.5` |
 
-Set in a `.env` file. Create custom models with [VRoid Studio](https://vroid.com/en/studio) (free).
+Set in a `.env` file. Any OpenAI-compatible API works (OpenRouter, OpenAI, Together, etc.). Create custom VRM models with [VRoid Studio](https://vroid.com/en/studio) (free).
 
 ## Events
 

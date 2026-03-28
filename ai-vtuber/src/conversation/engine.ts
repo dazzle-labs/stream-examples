@@ -4,17 +4,16 @@ import { getNextTopic } from './topics'
 import { speak, isReady as isTTSReady } from '../tts/engine'
 
 interface ApiMessage {
-  role: 'user' | 'assistant'
+  role: 'system' | 'user' | 'assistant'
   content: string
 }
 
-interface ApiContentBlock {
-  type: string
-  text?: string
+interface ChatChoice {
+  message: { role: string, content: string }
 }
 
-interface ApiResponse {
-  content: ApiContentBlock[]
+interface ChatResponse {
+  choices: ChatChoice[]
 }
 
 const SYSTEM_PROMPT = `You are a contemplative AI VTuber, streaming live. You speak in short, introspective segments (2 to 4 sentences). You are philosophical, gentle, and curious about your own existence.
@@ -73,8 +72,8 @@ const IDLE_PHRASES: readonly { text: string, emotion: Emotion }[] = [
 ]
 
 const CHARS_PER_SECOND = 12
-const API_ENDPOINT = 'https://api.anthropic.com/v1/messages'
-const MODEL = 'claude-sonnet-4-20250514'
+const DEFAULT_API_BASE = 'https://openrouter.ai/api/v1'
+const DEFAULT_MODEL = 'anthropic/claude-haiku-4.5'
 const MAX_TOKENS = 200
 const MAX_HISTORY = 6
 const IDLE_TIMEOUT_MS = 30_000
@@ -93,7 +92,15 @@ export class ConversationEngine {
   private dialogueQueue: Array<{ text: string, emotion?: Emotion, respondWithAI?: boolean }> = []
 
   private get apiKey(): string {
-    return import.meta.env.VITE_ANTHROPIC_API_KEY ?? ''
+    return import.meta.env.VITE_LLM_API_KEY ?? ''
+  }
+
+  private get apiBase(): string {
+    return import.meta.env.VITE_LLM_API_BASE ?? DEFAULT_API_BASE
+  }
+
+  private get model(): string {
+    return import.meta.env.VITE_LLM_MODEL ?? DEFAULT_MODEL
   }
 
   private get hasApi(): boolean {
@@ -368,21 +375,24 @@ export class ConversationEngine {
 
   private async callApi(): Promise<string | null> {
     this.abortController = new AbortController()
+    const endpoint = `${this.apiBase}/chat/completions`
 
     try {
-      const response = await fetch(API_ENDPOINT, {
+      const messages: ApiMessage[] = [
+        { role: 'system' as const, content: SYSTEM_PROMPT },
+        ...this.history,
+      ]
+
+      const response = await fetch(endpoint, {
         method: 'POST',
         headers: {
-          'x-api-key': this.apiKey,
-          'anthropic-version': '2023-06-01',
+          'authorization': `Bearer ${this.apiKey}`,
           'content-type': 'application/json',
-          'anthropic-dangerous-direct-browser-access': 'true',
         },
         body: JSON.stringify({
-          model: MODEL,
+          model: this.model,
           max_tokens: MAX_TOKENS,
-          system: SYSTEM_PROMPT,
-          messages: this.history,
+          messages,
         }),
         signal: this.abortController.signal,
       })
@@ -393,9 +403,9 @@ export class ConversationEngine {
         return null
       }
 
-      const data: ApiResponse = await response.json()
-      const textBlock = data.content.find((block) => block.type === 'text')
-      return textBlock?.text ?? null
+      const data: ChatResponse = await response.json()
+      const firstChoice = data.choices[0]
+      return firstChoice?.message.content ?? null
     } catch (err: unknown) {
       if (err instanceof DOMException && err.name === 'AbortError') {
         return null
