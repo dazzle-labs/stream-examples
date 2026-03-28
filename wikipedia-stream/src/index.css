@@ -1,0 +1,96 @@
+@import 'tailwindcss';
+
+@theme {
+  --color-bg: #000000;
+  --color-surface: #0a0a14;
+  --color-surface-light: #12121e;
+  --color-wiki-blue: #3366cc;
+  --color-wiki-blue-light: #5588ee;
+  --color-edit-green: #2ecc71;
+  --color-edit-red: #e74c3c;
+  --color-edit-yellow: #f1c40f;
+  --color-bot-purple: #9b59b6;
+  --color-minor-gray: #7f8c8d;
+  --color-text: #e8e8f0;
+  --color-text-dim: #666677;
+  --font-mono: 'SF Mono', 'Fira Code', 'Cascadia Code', Consolas, monospace;
+}
+
+body {
+  font-family: system-ui, -apple-system, sans-serif;
+  background: #000;
+  color: var(--color-text);
+}
+
+/* Edit item slide in */
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateX(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.animate-slide-in {
+  animation: slideIn 300ms ease-out;
+}
+
+/* Edit item fade out */
+@keyframes fadeOut {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+
+/* Pulse for live indicator */
+@keyframes livePulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+
+.animate-live-pulse {
+  animation: livePulse 1.5s ease-in-out infinite;
+}
+
+/* Size bar grow animation */
+@keyframes growWidth {
+  from { width: 0; }
+}
+
+.animate-grow-width {
+  animation: growWidth 400ms ease-out;
+}
+
+/* Globe rotation for geographic visualization */
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+/* Gentle glow for active elements */
+@keyframes glowPulse {
+  0%, 100% { box-shadow: 0 0 8px currentColor; }
+  50% { box-shadow: 0 0 16px currentColor; }
+}
+
+.animate-glow-pulse {
+  animation: glowPulse 2s ease-in-out infinite;
+}
+
+/* Counter tick animation */
+@keyframes tickUp {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-tick-up {
+  animation: tickUp 200ms ease-out;
+}
