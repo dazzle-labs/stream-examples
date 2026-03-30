@@ -63,7 +63,7 @@ export function BlueskyPulse() {
       />
 
       {/* Left zone: The Stream */}
-      <div className="relative w-[350px] h-full flex-shrink-0">
+      <div className="relative w-[320px] h-full flex-shrink-0">
         <StreamZone ref={streamRef} stats={stats} />
       </div>
 
@@ -86,7 +86,7 @@ export function BlueskyPulse() {
 
       {/* Right zone: The Dashboard */}
       <div
-        className="relative w-[360px] h-full flex-shrink-0 overflow-hidden"
+        className="relative w-[330px] h-full flex-shrink-0 overflow-hidden"
         style={{
           background: 'linear-gradient(135deg, rgba(10, 14, 20, 0.8) 0%, rgba(6, 8, 12, 0.95) 100%)',
         }}

@@ -141,7 +141,7 @@ const ActivityBar = React.memo(function ActivityBar({ postCount, replyCount, rep
           />
         ))}
       </div>
-      <div className="flex justify-between" style={{ marginTop: '8px' }}>
+      <div className="flex justify-between" style={{ marginTop: '4px' }}>
         {segments.map((seg) => (
           <div key={seg.label} className="flex items-center gap-1">
             <div className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: seg.color, opacity: 0.7 }} />
@@ -167,10 +167,10 @@ const LanguageBars = React.memo(function LanguageBars({ languageCounts }: { lang
 
   const sorted = [...languageCounts.entries()]
     .sort((a, b) => b[1] - a[1])
-    .slice(0, 6)
+    .slice(0, 4)
 
   return (
-    <div className="flex flex-col" style={{ gap: '4px' }}>
+    <div className="flex flex-col" style={{ gap: '2px' }}>
       {sorted.map(([lang, count]) => {
         const pct = (count / total) * 100
         const color = LANGUAGE_COLORS[lang] ?? LANGUAGE_COLORS['other'] ?? '#a78bfa'
@@ -380,23 +380,23 @@ export function DashboardZone({ stats }: { stats: FirehoseStats }) {
   // Shared section label style — industrial data dashboard aesthetic
   const sectionLabelStyle: React.CSSProperties = {
     color: '#6b7a8d',
-    fontSize: '11px',
+    fontSize: '10px',
     letterSpacing: '0.08em',
-    marginBottom: '8px',
+    marginBottom: '5px',
   }
 
   // Shared divider style — thin rule between major sections
   const dividerStyle: React.CSSProperties = {
     height: '1px',
     background: 'rgba(255, 255, 255, 0.06)',
-    marginTop: '12px',
-    marginBottom: '12px',
+    marginTop: '8px',
+    marginBottom: '8px',
   }
 
   return (
     <div
       className="h-full flex flex-col overflow-hidden"
-      style={{ padding: '24px 22px' }}
+      style={{ padding: '18px 22px' }}
     >
       {/* Title */}
       <div className="flex items-center justify-between" style={{ marginBottom: '18px' }}>
@@ -424,26 +424,26 @@ export function DashboardZone({ stats }: { stats: FirehoseStats }) {
       <div style={{ height: '1px', background: 'rgba(255,255,255,0.06)', marginBottom: '20px' }} />
 
       {/* Events per second - hero number */}
-      <div style={{ marginBottom: '8px' }}>
-        <div className="font-mono font-medium" style={{ ...sectionLabelStyle, marginBottom: '6px' }}>
+      <div style={{ marginBottom: '4px' }}>
+        <div className="font-mono font-medium" style={{ ...sectionLabelStyle, marginBottom: '4px' }}>
           EVENTS / SECOND
         </div>
         <div className="flex items-end gap-3">
           <span
-            className="font-mono text-[44px] font-bold leading-none tracking-tighter"
+            className="font-mono text-[32px] font-bold leading-none tracking-tighter"
             style={{ color: '#0085ff' }}
           >
             {stats.eventsPerSecond}
           </span>
-          <span className="font-mono text-[11px]" style={{ color: '#3a4656', marginBottom: '4px' }}>
+          <span className="font-mono text-[11px]" style={{ color: '#3a4656', marginBottom: '2px' }}>
             evt/s
           </span>
         </div>
       </div>
 
-      {/* Sparkline — generous bottom margin for hero section breathing room */}
-      <div className="overflow-hidden" style={{ marginBottom: '16px' }}>
-        <Sparkline data={stats.sparkline} width={300} height={40} />
+      {/* Sparkline — compact */}
+      <div className="overflow-hidden" style={{ marginBottom: '8px' }}>
+        <Sparkline data={stats.sparkline} width={300} height={28} />
         <div className="flex justify-between" style={{ marginTop: '3px' }}>
           <span className="font-mono text-[8px]" style={{ color: '#3a4656' }}>60s ago</span>
           <span className="font-mono text-[8px]" style={{ color: '#3a4656' }}>now</span>
@@ -482,7 +482,7 @@ export function DashboardZone({ stats }: { stats: FirehoseStats }) {
         </div>
         {topTag ? (
           <div className="flex items-baseline gap-2 overflow-hidden">
-            <span className="font-display text-[22px] font-bold truncate" style={{ color: '#0085ff' }}>
+            <span className="font-display text-[18px] font-bold truncate" style={{ color: '#0085ff' }}>
               #{topTag[0]}
             </span>
             <span className="font-mono text-[11px]" style={{ color: '#6b7a8d' }}>

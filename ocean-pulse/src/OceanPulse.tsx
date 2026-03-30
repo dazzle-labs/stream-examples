@@ -69,6 +69,7 @@ interface WaveLayer {
 const W = 1280
 const H = 720
 const SAFE = 40
+const TEXT_EDGE = 16
 
 // Map projection bounds — continental US focus
 const LAT_MIN = 24
@@ -734,41 +735,41 @@ export function OceanPulse() {
     // Title (top-left)
     ctx.font = '500 22px IBM Plex Mono, monospace'
     ctx.fillStyle = 'rgba(180, 210, 240, 0.85)'
-    ctx.fillText('OCEAN PULSE', SAFE, SAFE + 20)
+    ctx.fillText('OCEAN PULSE', TEXT_EDGE, TEXT_EDGE + 20)
 
     ctx.font = '300 11px IBM Plex Mono, monospace'
     ctx.fillStyle = 'rgba(100, 140, 180, 0.6)'
-    ctx.fillText('NOAA NDBC  \u00b7  LIVE BUOY OBSERVATIONS', SAFE, SAFE + 38)
+    ctx.fillText('NOAA NDBC  \u00b7  LIVE BUOY OBSERVATIONS', TEXT_EDGE, TEXT_EDGE + 38)
 
     // Live indicator
     const livePulse = Math.sin(time * 0.003) * 0.5 + 0.5
     ctx.fillStyle = `rgba(255, 60, 60, ${0.5 + livePulse * 0.5})`
     ctx.beginPath()
-    ctx.arc(SAFE + 218, SAFE + 14, 3, 0, Math.PI * 2)
+    ctx.arc(TEXT_EDGE + 218, TEXT_EDGE + 14, 3, 0, Math.PI * 2)
     ctx.fill()
 
     ctx.font = '500 9px IBM Plex Mono, monospace'
     ctx.fillStyle = `rgba(255, 100, 100, ${0.5 + livePulse * 0.5})`
-    ctx.fillText('LIVE', SAFE + 225, SAFE + 17)
+    ctx.fillText('LIVE', TEXT_EDGE + 225, TEXT_EDGE + 17)
 
     // Stats (top-right)
     ctx.textAlign = 'right'
     ctx.font = '400 11px IBM Plex Mono, monospace'
     ctx.fillStyle = 'rgba(100, 140, 180, 0.6)'
-    ctx.fillText(`${stats.stationCount} STATIONS`, W - SAFE, SAFE + 16)
+    ctx.fillText(`${stats.stationCount} STATIONS`, W - TEXT_EDGE, TEXT_EDGE + 16)
 
     ctx.fillStyle = 'rgba(80, 180, 255, 0.6)'
     ctx.fillText(
       `AVG WAVE: ${stats.avgWvht.toFixed(1)}m`,
-      W - SAFE,
-      SAFE + 32,
+      W - TEXT_EDGE,
+      TEXT_EDGE + 32,
     )
 
     ctx.fillStyle = 'rgba(255, 160, 60, 0.6)'
     ctx.fillText(
       `MAX WIND: ${stats.maxWspd.toFixed(1)} m/s`,
-      W - SAFE,
-      SAFE + 48,
+      W - TEXT_EDGE,
+      TEXT_EDGE + 48,
     )
     ctx.textAlign = 'left'
 
@@ -781,8 +782,8 @@ export function OceanPulse() {
 
     // ─── Legend panel (center-left, inland Great Plains) ───────
     // All legends grouped in a single panel, sized for TV readability
-    const panelW = 340
-    const panelH = 150
+    const panelW = 280
+    const panelH = 123
     const panelX = 550 - panelW / 2
     const panelY = 360 - panelH / 2
 
@@ -793,16 +794,16 @@ export function OceanPulse() {
     ctx.lineWidth = 1
     ctx.strokeRect(panelX, panelY, panelW, panelH)
 
-    const padX = 16
+    const padX = 14
     const innerLeft = panelX + padX
     const barW = panelW - padX * 2
 
     // ── Water Temperature color scale ─────────────────────
-    const tempLabelY = panelY + 24
-    const tempBarY = panelY + 32
-    const tempBarH = 14
+    const tempLabelY = panelY + 18
+    const tempBarY = panelY + 24
+    const tempBarH = 10
 
-    ctx.font = '500 16px IBM Plex Mono, monospace'
+    ctx.font = '500 12px IBM Plex Mono, monospace'
     ctx.fillStyle = 'rgba(180, 210, 240, 0.85)'
     ctx.fillText('WATER TEMP (\u00b0C)', innerLeft, tempLabelY)
 
@@ -820,25 +821,25 @@ export function OceanPulse() {
     ctx.fillRect(innerLeft, tempBarY, barW, tempBarH)
 
     // Temperature labels
-    ctx.font = '400 14px IBM Plex Mono, monospace'
+    ctx.font = '400 10px IBM Plex Mono, monospace'
     ctx.fillStyle = 'rgba(180, 210, 240, 0.8)'
     ctx.textAlign = 'center'
     const tempLabels = [0, 10, 20, 30]
     for (const t of tempLabels) {
-      const tx = innerLeft + (t / 35) * barW
-      ctx.fillText(`${t}\u00b0`, tx, tempBarY + tempBarH + 16)
+      const tx = innerLeft + (t / 35) * barW + (t === 0 ? 8 : 0)
+      ctx.fillText(`${t}\u00b0`, tx, tempBarY + tempBarH + 12)
     }
     ctx.textAlign = 'left'
 
     // ── Wave Height size legend ───────────────────────────
-    const waveY = panelY + 80
+    const waveY = panelY + 70
 
-    ctx.font = '500 16px IBM Plex Mono, monospace'
+    ctx.font = '500 12px IBM Plex Mono, monospace'
     ctx.fillStyle = 'rgba(180, 210, 240, 0.85)'
     ctx.fillText('WAVE HEIGHT', innerLeft, waveY)
 
     // Sample dots at increasing sizes to show wave height mapping
-    ctx.font = '400 14px IBM Plex Mono, monospace'
+    ctx.font = '400 10px IBM Plex Mono, monospace'
     ctx.fillStyle = 'rgba(180, 210, 240, 0.7)'
     const waveSamples: readonly (readonly [string, number])[] = [
       ['1m', 2 + 1 * 1.2],
@@ -850,33 +851,33 @@ export function OceanPulse() {
       // Draw sample dot
       ctx.fillStyle = 'rgba(0, 180, 255, 0.6)'
       ctx.beginPath()
-      ctx.arc(dotX, waveY + 20, radius, 0, Math.PI * 2)
+      ctx.arc(dotX, waveY + 18, radius, 0, Math.PI * 2)
       ctx.fill()
       // Bright center
       ctx.fillStyle = 'rgba(255, 255, 255, 0.4)'
       ctx.beginPath()
-      ctx.arc(dotX, waveY + 20, radius * 0.3, 0, Math.PI * 2)
+      ctx.arc(dotX, waveY + 18, radius * 0.3, 0, Math.PI * 2)
       ctx.fill()
       // Label below
       ctx.fillStyle = 'rgba(180, 210, 240, 0.7)'
       ctx.textAlign = 'center'
-      ctx.fillText(label, dotX, waveY + 40)
-      dotX += 70
+      ctx.fillText(label, dotX, waveY + 35)
+      dotX += 55
     }
 
     // ── Wind Speed legend ─────────────────────────────────
     ctx.textAlign = 'left'
-    const windLegX = innerLeft + 220
-    ctx.font = '500 16px IBM Plex Mono, monospace'
+    const windLegX = innerLeft + 180
+    ctx.font = '500 12px IBM Plex Mono, monospace'
     ctx.fillStyle = 'rgba(180, 210, 240, 0.85)'
     ctx.fillText('WIND', windLegX, waveY)
 
     // Wind arrow sample
-    const arrowBaseX = windLegX + 20
-    const arrowBaseY = waveY + 20
-    const arrowLen = 36
+    const arrowBaseX = windLegX + 14
+    const arrowBaseY = waveY + 18
+    const arrowLen = 30
     ctx.strokeStyle = 'rgba(0, 180, 255, 0.7)'
-    ctx.lineWidth = 2
+    ctx.lineWidth = 1.5
     ctx.beginPath()
     ctx.moveTo(arrowBaseX, arrowBaseY)
     ctx.lineTo(arrowBaseX + arrowLen, arrowBaseY)
@@ -884,15 +885,15 @@ export function OceanPulse() {
     // Arrowhead
     ctx.beginPath()
     ctx.moveTo(arrowBaseX + arrowLen, arrowBaseY)
-    ctx.lineTo(arrowBaseX + arrowLen - 9, arrowBaseY - 6)
+    ctx.lineTo(arrowBaseX + arrowLen - 7, arrowBaseY - 4)
     ctx.moveTo(arrowBaseX + arrowLen, arrowBaseY)
-    ctx.lineTo(arrowBaseX + arrowLen - 9, arrowBaseY + 6)
+    ctx.lineTo(arrowBaseX + arrowLen - 7, arrowBaseY + 4)
     ctx.stroke()
 
-    ctx.font = '400 13px IBM Plex Mono, monospace'
+    ctx.font = '400 10px IBM Plex Mono, monospace'
     ctx.fillStyle = 'rgba(180, 210, 240, 0.65)'
     ctx.textAlign = 'center'
-    ctx.fillText('direction', arrowBaseX + arrowLen / 2, arrowBaseY + 22)
+    ctx.fillText('direction', arrowBaseX + arrowLen / 2, arrowBaseY + 16)
     ctx.textAlign = 'left'
 
     // ─── Fetch error indicator ───────────────────────────────

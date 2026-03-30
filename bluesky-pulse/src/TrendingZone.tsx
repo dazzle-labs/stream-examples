@@ -43,8 +43,8 @@ const MAX_MOTES = 18
 const REF_DIM = 528
 
 // Radii as fractions of the container's shorter dimension
-const MIN_RADIUS_FRAC = 0.04
-const MAX_RADIUS_FRAC = 0.10
+const MIN_RADIUS_FRAC = 0.07
+const MAX_RADIUS_FRAC = 0.155
 
 // How fast radius eases toward target
 const RADIUS_LERP = 0.07
