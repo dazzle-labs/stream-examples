@@ -104,9 +104,9 @@ const AK_W = 150
 const AK_H = 100
 
 // Hawaii inset
-const HI_LEFT = MAP_LEFT + 160
-const HI_TOP = MAP_BOTTOM - 80
-const HI_W = 80
+const HI_LEFT = MAP_LEFT
+const HI_TOP = MAP_BOTTOM - 10
+const HI_W = 100
 const HI_H = 60
 
 // Data
@@ -640,18 +640,23 @@ export function OceanPulse() {
     }
 
     // ─── Inset borders (Alaska / Hawaii) ─────────────────────
-    ctx.strokeStyle = 'rgba(30, 55, 80, 0.3)'
-    ctx.lineWidth = 0.5
-    ctx.setLineDash([3, 3])
-    ctx.strokeRect(AK_LEFT - 5, AK_TOP - 5, AK_W + 10, AK_H + 10)
-    ctx.strokeRect(HI_LEFT - 5, HI_TOP - 5, HI_W + 10, HI_H + 10)
+    // Background fill to separate from main map
+    ctx.fillStyle = 'rgba(5, 10, 20, 0.5)'
+    ctx.fillRect(AK_LEFT - 8, AK_TOP - 8, AK_W + 16, AK_H + 16)
+    ctx.fillRect(HI_LEFT - 8, HI_TOP - 8, HI_W + 16, HI_H + 16)
+
+    ctx.strokeStyle = 'rgba(40, 70, 110, 0.5)'
+    ctx.lineWidth = 1
+    ctx.setLineDash([4, 3])
+    ctx.strokeRect(AK_LEFT - 8, AK_TOP - 8, AK_W + 16, AK_H + 16)
+    ctx.strokeRect(HI_LEFT - 8, HI_TOP - 8, HI_W + 16, HI_H + 16)
     ctx.setLineDash([])
 
     // Inset labels
-    ctx.font = '8px IBM Plex Mono, monospace'
-    ctx.fillStyle = 'rgba(100, 140, 180, 0.4)'
-    ctx.fillText('AK', AK_LEFT, AK_TOP - 8)
-    ctx.fillText('HI', HI_LEFT, HI_TOP - 8)
+    ctx.font = '500 11px IBM Plex Mono, monospace'
+    ctx.fillStyle = 'rgba(140, 175, 210, 0.7)'
+    ctx.fillText('ALASKA', AK_LEFT - 4, AK_TOP - 12)
+    ctx.fillText('HAWAII', HI_LEFT - 4, HI_TOP - 12)
 
     // ─── Buoys ───────────────────────────────────────────────
     const interpSpeed = 0.02

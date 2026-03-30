@@ -28,8 +28,8 @@ const SAMPLE_RATE = 48000
 const MARGIN_TOP = 30
 const MARGIN_BOTTOM = 30
 const SPECTROGRAM_HEIGHT = HEIGHT - MARGIN_TOP - MARGIN_BOTTOM
-const NODE_SWITCH_INTERVAL = 150_000 // 2.5 minutes in ms
-const CROSSFADE_DURATION = 2_000 // 2 seconds in ms
+const NODE_SWITCH_INTERVAL = 150_000
+const CROSSFADE_DURATION = 2_000
 const RETRY_DELAY_MS = 8000
 const MAX_RETRIES = 50
 const NOISE_FLOOR = 0.03
@@ -48,21 +48,19 @@ const NODES: HydrophoneNode[] = [
 // -- Colormap LUT (pre-computed 256 entries x 4 channels) ------------------
 
 const COLORMAP_ANCHORS: [number, number, number, number][] = [
-  // [r, g, b, position 0-1]
-  [1, 2, 8, 0],             // background — near-black with blue undertone
-  [10, 4, 40, 0.15],        // deep indigo
-  [12, 58, 58, 0.30],       // dark teal
-  [26, 138, 122, 0.50],     // medium cyan
-  [64, 232, 208, 0.70],     // bright cyan
-  [232, 160, 32, 0.88],     // warm amber
-  [255, 248, 240, 1.0],     // hot white
+  [1, 2, 8, 0],
+  [10, 4, 40, 0.15],
+  [12, 58, 58, 0.30],
+  [26, 138, 122, 0.50],
+  [64, 232, 208, 0.70],
+  [232, 160, 32, 0.88],
+  [255, 248, 240, 1.0],
 ]
 
 function buildColormapLUT(): Uint8Array {
   const lut = new Uint8Array(256 * 4)
   for (let i = 0; i < 256; i++) {
     const t = i / 255
-    // Find which two anchors we're between
     let loIdx = 0
     for (let a = 0; a < COLORMAP_ANCHORS.length - 1; a++) {
       const anchor = COLORMAP_ANCHORS[a]
@@ -77,7 +75,6 @@ function buildColormapLUT(): Uint8Array {
 
     const range = hi[3] - lo[3]
     const frac = range > 0 ? (t - lo[3]) / range : 0
-    // Smoothstep for nicer interpolation
     const s = frac * frac * (3 - 2 * frac)
 
     const offset = i * 4
@@ -91,25 +88,78 @@ function buildColormapLUT(): Uint8Array {
 
 const COLORMAP_LUT = buildColormapLUT()
 
-// -- Logarithmic frequency mapping -----------------------------------------
-// Pre-compute the mapping from pixel row to FFT bin index
+// -- Pre-compute normalized value to LUT index mapping --------------------
+// Avoids per-pixel Math.pow, Math.round, Math.min, Math.max in the hot loop
 
-function buildFreqMap(height: number, maxBin: number): Float64Array {
-  // Map each pixel row to a frequency bin using log scale
-  // Bottom row = low freq, top row = high freq
-  const minFreq = 20  // Hz
+function buildValueToLutIndex(): Uint8Array {
+  const table = new Uint8Array(256)
+  for (let i = 0; i < 256; i++) {
+    const normalized = i / 255
+    const withFloor = NOISE_FLOOR + normalized * (1 - NOISE_FLOOR)
+    const shaped = Math.pow(withFloor, POWER_CURVE)
+    table[i] = Math.min(255, Math.max(0, Math.round(shaped * 255)))
+  }
+  return table
+}
+
+const VALUE_TO_LUT_INDEX = buildValueToLutIndex()
+
+// Pre-packed RGBA uint32 for each possible LUT index (little-endian: ABGR)
+function buildPackedColors(): Uint32Array {
+  const packed = new Uint32Array(256)
+  for (let i = 0; i < 256; i++) {
+    const off = i << 2
+    const r = COLORMAP_LUT[off] ?? 0
+    const g = COLORMAP_LUT[off + 1] ?? 0
+    const b = COLORMAP_LUT[off + 2] ?? 0
+    packed[i] = (255 << 24) | (b << 16) | (g << 8) | r
+  }
+  return packed
+}
+
+const PACKED_COLORS = buildPackedColors()
+
+// Direct FFT value -> packed RGBA pixel (combines VALUE_TO_LUT_INDEX + PACKED_COLORS)
+function buildValueToPackedColor(): Uint32Array {
+  const table = new Uint32Array(256)
+  for (let i = 0; i < 256; i++) {
+    const lutIdx = VALUE_TO_LUT_INDEX[i] ?? 0
+    table[i] = PACKED_COLORS[lutIdx] ?? 0xFF010208
+  }
+  return table
+}
+
+const VALUE_TO_PACKED = buildValueToPackedColor()
+
+// -- Logarithmic frequency mapping -----------------------------------------
+
+interface FreqMapEntry {
+  binLo: number
+  binHi: number
+  fracHi: number
+  fracLo: number
+}
+
+function buildFreqMap(height: number, maxBin: number): FreqMapEntry[] {
+  const minFreq = 20
   const maxFreq = SAMPLE_RATE / 2
   const logMin = Math.log(minFreq)
   const logMax = Math.log(maxFreq)
-  const map = new Float64Array(height)
+  const map: FreqMapEntry[] = new Array(height)
 
   for (let y = 0; y < height; y++) {
-    // y=0 is top (high freq), y=height-1 is bottom (low freq)
     const ratio = 1 - y / (height - 1)
     const logFreq = logMin + ratio * (logMax - logMin)
     const freq = Math.exp(logFreq)
-    const bin = freq / (SAMPLE_RATE / FFT_SIZE)
-    map[y] = Math.min(bin, maxBin - 1)
+    const binFloat = Math.min(freq / (SAMPLE_RATE / FFT_SIZE), maxBin - 1)
+    const binLo = Math.floor(binFloat)
+    const fracHi = binFloat - binLo
+    map[y] = {
+      binLo,
+      binHi: Math.min(binLo + 1, maxBin - 1),
+      fracHi,
+      fracLo: 1 - fracHi,
+    }
   }
   return map
 }
@@ -128,7 +178,6 @@ function getWhaleBandRows(height: number): [number, number] {
   const ratioLow = (logLow - logMin) / (logMax - logMin)
   const ratioHigh = (logHigh - logMin) / (logMax - logMin)
 
-  // y=0 is top (high freq), so invert
   const yHigh = Math.floor((1 - ratioHigh) * (height - 1))
   const yLow = Math.floor((1 - ratioLow) * (height - 1))
   return [yHigh, yLow]
@@ -206,7 +255,7 @@ function loadGeistMono(): void {
   fontFace.load().then((loaded) => {
     document.fonts.add(loaded)
   }).catch(() => {
-    // Falls back to monospace — fine
+    // Falls back to monospace
   })
 }
 
@@ -237,10 +286,18 @@ export function App() {
     const freqLabels = buildFreqLabels(SPECTROGRAM_HEIGHT)
     const [whaleBandTop, whaleBandBottom] = getWhaleBandRows(SPECTROGRAM_HEIGHT)
 
-    // -- Spectrogram buffer (pixel data for full canvas) --
-    // Store as a 2D array: each column is a Uint8Array of RGBA for SPECTROGRAM_HEIGHT pixels
-    const spectrogramColumns: Uint8Array[] = []
-    const columnImageData = ctx.createImageData(1, SPECTROGRAM_HEIGHT)
+    // -- Spectrogram circular buffer --
+    // Full-width ImageData for single putImageData call per frame
+    const spectrogramImageData = ctx.createImageData(WIDTH, SPECTROGRAM_HEIGHT)
+    const spectrogramPixels32 = new Uint32Array(spectrogramImageData.data.buffer)
+    // Circular buffer: ring of packed RGBA uint32 values per column
+    const columnRing32 = new Uint32Array(WIDTH * SPECTROGRAM_HEIGHT)
+    let writeHead = 0
+    let columnCount = 0
+
+    // Reusable column buffers (packed uint32 RGBA)
+    const columnBufA32 = new Uint32Array(SPECTROGRAM_HEIGHT)
+    const columnBufB32 = new Uint32Array(SPECTROGRAM_HEIGHT)
 
     // -- Node states --
     const nodeStates: NodeState[] = NODES.map((node) => ({
@@ -266,7 +323,6 @@ export function App() {
         return fetchManifestUrl(state.node.slug).then((manifestUrl) => {
           const audio = document.createElement('audio')
           audio.crossOrigin = 'anonymous'
-          // Only the active node should be audible; mute others
           audio.volume = state.node.id === NODES[activeNodeIndex]?.id ? 0.7 : 0
 
           if (Hls.isSupported()) {
@@ -353,83 +409,147 @@ export function App() {
       }
     }
 
-    // -- Render a single spectrogram column from FFT data --
-    function renderColumn(freqData: Uint8Array<ArrayBufferLike>): Uint8Array {
-      const pixels = new Uint8Array(SPECTROGRAM_HEIGHT * 4)
-
+    // -- Render a single spectrogram column from FFT data into target buffer --
+    function renderColumnInto(freqData: Uint8Array<ArrayBufferLike>, target: Uint32Array): void {
       for (let y = 0; y < SPECTROGRAM_HEIGHT; y++) {
-        const binFloat = freqMap[y]
-        if (binFloat === undefined) continue
+        const entry = freqMap[y]
+        if (!entry) continue
 
-        // Interpolate between adjacent bins for smoother rendering
-        const binLo = Math.floor(binFloat)
-        const binHi = Math.min(binLo + 1, freqData.length - 1)
-        const frac = binFloat - binLo
-        const valLo = freqData[binLo]
-        const valHi = freqData[binHi]
+        const valLo = freqData[entry.binLo]
+        const valHi = freqData[entry.binHi]
         if (valLo === undefined || valHi === undefined) continue
 
-        const rawVal = valLo + (valHi - valLo) * frac
-        const normalized = rawVal / 255
-
-        // Apply noise floor and power curve
-        const withFloor = NOISE_FLOOR + normalized * (1 - NOISE_FLOOR)
-        const shaped = Math.pow(withFloor, POWER_CURVE)
-
-        // Clamp to 0-255 for LUT lookup
-        const lutIndex = Math.min(255, Math.max(0, Math.round(shaped * 255)))
-        const lutOffset = lutIndex * 4
-
-        const offset = y * 4
-        pixels[offset] = COLORMAP_LUT[lutOffset] ?? 0
-        pixels[offset + 1] = COLORMAP_LUT[lutOffset + 1] ?? 0
-        pixels[offset + 2] = COLORMAP_LUT[lutOffset + 2] ?? 0
-        pixels[offset + 3] = 255
+        const rawVal = (valLo * entry.fracLo + valHi * entry.fracHi) | 0
+        target[y] = VALUE_TO_PACKED[rawVal] ?? 0xFF010208
       }
-
-      return pixels
     }
 
-    // -- Blend two columns (for crossfade) --
-    function blendColumns(colA: Uint8Array, colB: Uint8Array, t: number): Uint8Array {
-      const result = new Uint8Array(colA.length)
-      const invT = 1 - t
-      for (let i = 0; i < colA.length; i++) {
-        const a = colA[i]
-        const b = colB[i]
-        if (a !== undefined && b !== undefined) {
-          result[i] = Math.round(a * invT + b * t)
-        }
+    // -- Blend column B into column A with factor t (result written to A) --
+    // Operates on packed ABGR uint32 values, blends per channel
+    function blendColumnsInto(colA: Uint32Array, colB: Uint32Array, t: number): void {
+      const tInt = (t * 256) | 0
+      const invT = 256 - tInt
+      for (let i = 0; i < SPECTROGRAM_HEIGHT; i++) {
+        const a = colA[i] ?? 0
+        const b = colB[i] ?? 0
+        const rA = a & 0xFF
+        const gA = (a >> 8) & 0xFF
+        const bA = (a >> 16) & 0xFF
+        const rB = b & 0xFF
+        const gB = (b >> 8) & 0xFF
+        const bB = (b >> 16) & 0xFF
+        const r = (rA * invT + rB * tInt) >> 8
+        const g = (gA * invT + gB * tInt) >> 8
+        const bl = (bA * invT + bB * tInt) >> 8
+        colA[i] = (255 << 24) | (bl << 16) | (g << 8) | r
       }
-      return result
     }
 
-    // -- Vignette (pre-rendered as ImageData) --
-    const vignetteCanvas = document.createElement('canvas')
-    vignetteCanvas.width = WIDTH
-    vignetteCanvas.height = HEIGHT
-    const vignetteCtx = vignetteCanvas.getContext('2d')
-    if (vignetteCtx) {
+    // -- Write a column into the circular buffer --
+    function pushColumn(pixels: Uint32Array): void {
+      const ringOffset = writeHead * SPECTROGRAM_HEIGHT
+      columnRing32.set(pixels, ringOffset)
+      writeHead = (writeHead + 1) % WIDTH
+      if (columnCount < WIDTH) columnCount++
+    }
+
+    // -- Combined vignette + scanline overlay (pre-rendered once) --
+    const overlayCanvas = document.createElement('canvas')
+    overlayCanvas.width = WIDTH
+    overlayCanvas.height = HEIGHT
+    const overlayCtx = overlayCanvas.getContext('2d')
+    if (overlayCtx) {
       const cx = WIDTH / 2
       const cy = HEIGHT / 2
       const maxR = Math.sqrt(cx * cx + cy * cy)
-      const grad = vignetteCtx.createRadialGradient(cx, cy, maxR * 0.3, cx, cy, maxR)
+      const grad = overlayCtx.createRadialGradient(cx, cy, maxR * 0.3, cx, cy, maxR)
       grad.addColorStop(0, 'rgba(0,0,0,0)')
       grad.addColorStop(1, 'rgba(0,0,0,0.4)')
-      vignetteCtx.fillStyle = grad
-      vignetteCtx.fillRect(0, 0, WIDTH, HEIGHT)
+      overlayCtx.fillStyle = grad
+      overlayCtx.fillRect(0, 0, WIDTH, HEIGHT)
+      overlayCtx.fillStyle = 'rgba(0,0,0,0.035)'
+      for (let y = 0; y < HEIGHT; y += 2) {
+        overlayCtx.fillRect(0, y, WIDTH, 1)
+      }
     }
 
-    // -- Scanline pattern (pre-rendered) --
-    const scanlineCanvas = document.createElement('canvas')
-    scanlineCanvas.width = WIDTH
-    scanlineCanvas.height = HEIGHT
-    const scanlineCtx = scanlineCanvas.getContext('2d')
-    if (scanlineCtx) {
-      scanlineCtx.fillStyle = 'rgba(0,0,0,0.035)'
-      for (let y = 0; y < HEIGHT; y += 2) {
-        scanlineCtx.fillRect(0, y, WIDTH, 1)
+    // -- Pre-cache whale band gradient --
+    const whaleBandHeight = whaleBandBottom - whaleBandTop
+    const whaleBandY = whaleBandTop + MARGIN_TOP
+    const whaleGlowGradient = ctx.createLinearGradient(0, whaleBandY, 0, whaleBandY + whaleBandHeight)
+    whaleGlowGradient.addColorStop(0, 'rgba(64, 232, 208, 0)')
+    whaleGlowGradient.addColorStop(0.3, 'rgba(64, 232, 208, 0.012)')
+    whaleGlowGradient.addColorStop(0.5, 'rgba(64, 232, 208, 0.018)')
+    whaleGlowGradient.addColorStop(0.7, 'rgba(64, 232, 208, 0.012)')
+    whaleGlowGradient.addColorStop(1, 'rgba(64, 232, 208, 0)')
+
+    // -- Pre-cache font strings and text measurements --
+    const fontFamily = '\'Geist Mono\', monospace'
+    const fontTitle = `600 16px ${fontFamily}`
+    const fontSubtitle = `400 10px ${fontFamily}`
+    const fontNode = `500 12px ${fontFamily}`
+    const fontFreq = `500 13px ${fontFamily}`
+    const fontTime = `500 12px ${fontFamily}`
+    const titleX = 110
+    const subtitleText = 'LIVE UNDERWATER AUDIO  \u00b7  PUGET SOUND, WA'
+
+    // Cached text measurements (populated after first frame when fonts load)
+    let cachedTitleW = 0
+    let cachedSubtitleW = 0
+    const cachedNodeWidths = new Map<string, number>()
+    const cachedLabelWidths = new Map<string, number>()
+    let cachedTimeW = 0
+    let measurementsDirty = true
+
+    function refreshMeasurements(): void {
+      ctx.font = fontTitle
+      ctx.letterSpacing = '6px'
+      cachedTitleW = ctx.measureText('ORCASOUND HYDROPHONES').width + 8
+      ctx.letterSpacing = '0px'
+
+      ctx.font = fontSubtitle
+      cachedSubtitleW = ctx.measureText(subtitleText).width
+
+      ctx.font = fontNode
+      for (const node of NODES) {
+        cachedNodeWidths.set(node.id, ctx.measureText(node.name).width)
       }
+
+      ctx.font = fontFreq
+      for (const label of freqLabels) {
+        cachedLabelWidths.set(label.text, ctx.measureText(label.text).width)
+      }
+
+      ctx.font = fontTime
+      cachedTimeW = ctx.measureText('00:00:00 UTC').width
+
+      measurementsDirty = false
+    }
+
+    // Re-measure when fonts finish loading
+    document.fonts.ready.then(() => { measurementsDirty = true })
+
+    // -- UTC time formatting buffer --
+    const timeParts = new Uint8Array(8)
+    let lastTimeSecond = -1
+    let cachedTimeStr = ''
+
+    function getTimeStr(now: number): string {
+      const second = Math.floor(now / 1000)
+      if (second === lastTimeSecond) return cachedTimeStr
+      lastTimeSecond = second
+      const d = new Date(now)
+      const h = d.getUTCHours()
+      const m = d.getUTCMinutes()
+      const s = d.getUTCSeconds()
+      timeParts[0] = (h / 10) | 0
+      timeParts[1] = h % 10
+      timeParts[2] = (m / 10) | 0
+      timeParts[3] = m % 10
+      timeParts[4] = (s / 10) | 0
+      timeParts[5] = s % 10
+      cachedTimeStr = `${timeParts[0]}${timeParts[1]}:${timeParts[2]}${timeParts[3]}:${timeParts[4]}${timeParts[5]} UTC`
+      return cachedTimeStr
     }
 
     // -- Frame timing --
@@ -439,6 +559,8 @@ export function App() {
       animationId = requestAnimationFrame(tick)
 
       const now = Date.now()
+
+      if (measurementsDirty) refreshMeasurements()
 
       // -- Node switching logic --
       if (now - lastSwitchTime > NODE_SWITCH_INTERVAL && !isCrossfading) {
@@ -464,139 +586,105 @@ export function App() {
       const activeState = nodeStates[activeNodeIndex]
       if (activeState && activeState.analyser && activeState.connected && activeState.freqData) {
         activeState.analyser.getByteFrequencyData(activeState.freqData)
-        const newCol = renderColumn(activeState.freqData)
+        renderColumnInto(activeState.freqData, columnBufA32)
 
-        // During crossfade, blend with previous node's data
         if (isCrossfading && previousNodeIndex >= 0) {
           const prevState = nodeStates[previousNodeIndex]
           if (prevState && prevState.analyser && prevState.connected && prevState.freqData) {
             prevState.analyser.getByteFrequencyData(prevState.freqData)
-            const prevCol = renderColumn(prevState.freqData)
-            const blended = blendColumns(prevCol, newCol, crossfadeProgress)
-            spectrogramColumns.push(blended)
+            renderColumnInto(prevState.freqData, columnBufB32)
+            blendColumnsInto(columnBufB32, columnBufA32, crossfadeProgress)
+            pushColumn(columnBufB32)
           } else {
-            spectrogramColumns.push(newCol)
+            pushColumn(columnBufA32)
           }
         } else {
-          spectrogramColumns.push(newCol)
-        }
-
-        // Keep buffer at canvas width
-        while (spectrogramColumns.length > WIDTH) {
-          spectrogramColumns.shift()
+          pushColumn(columnBufA32)
         }
       }
 
       // -- Render --
-      // Fill background
       ctx.fillStyle = '#010208'
       ctx.fillRect(0, 0, WIDTH, HEIGHT)
 
-      // Draw spectrogram — one column at a time using putImageData
-      const colCount = spectrogramColumns.length
-      if (colCount > 0) {
-        // Columns scroll right-to-left: newest on right, oldest on left
-        const startX = WIDTH - colCount
+      // Build full spectrogram ImageData from circular buffer in one pass (uint32)
+      if (columnCount > 0) {
+        const startX = WIDTH - columnCount
+        let ringIdx = (writeHead - columnCount + WIDTH) % WIDTH
 
-        for (let c = 0; c < colCount; c++) {
-          const col = spectrogramColumns[c]
-          if (!col) continue
-
-          // Copy pixel data into the ImageData buffer
-          const imgData = columnImageData.data
+        for (let c = 0; c < columnCount; c++) {
+          const ringOffset = ringIdx * SPECTROGRAM_HEIGHT
+          const pixelX = startX + c
           for (let y = 0; y < SPECTROGRAM_HEIGHT; y++) {
-            const srcOff = y * 4
-            const dstOff = y * 4
-            imgData[dstOff] = col[srcOff] ?? 0
-            imgData[dstOff + 1] = col[srcOff + 1] ?? 0
-            imgData[dstOff + 2] = col[srcOff + 2] ?? 0
-            imgData[dstOff + 3] = 255
+            spectrogramPixels32[y * WIDTH + pixelX] = columnRing32[ringOffset + y] ?? 0
           }
-
-          ctx.putImageData(columnImageData, startX + c, MARGIN_TOP)
+          ringIdx = (ringIdx + 1) % WIDTH
         }
+
+        ctx.putImageData(spectrogramImageData, 0, MARGIN_TOP)
       }
 
-      // -- Whale band glow: subtle brightness in the 1-6kHz range --
+      // -- Whale band glow --
       ctx.save()
       ctx.globalCompositeOperation = 'lighter'
-      const whaleBandHeight = whaleBandBottom - whaleBandTop
-      const whaleBandY = whaleBandTop + MARGIN_TOP
-      const whaleGlow = ctx.createLinearGradient(0, whaleBandY, 0, whaleBandY + whaleBandHeight)
-      whaleGlow.addColorStop(0, 'rgba(64, 232, 208, 0)')
-      whaleGlow.addColorStop(0.3, 'rgba(64, 232, 208, 0.012)')
-      whaleGlow.addColorStop(0.5, 'rgba(64, 232, 208, 0.018)')
-      whaleGlow.addColorStop(0.7, 'rgba(64, 232, 208, 0.012)')
-      whaleGlow.addColorStop(1, 'rgba(64, 232, 208, 0)')
-      ctx.fillStyle = whaleGlow
+      ctx.fillStyle = whaleGlowGradient
       ctx.fillRect(0, whaleBandY, WIDTH, whaleBandHeight)
       ctx.restore()
 
-      // -- Post-processing overlays --
-      // Vignette
-      ctx.drawImage(vignetteCanvas, 0, 0)
-      // Scanlines
-      ctx.drawImage(scanlineCanvas, 0, 0)
+      // -- Post-processing overlay --
+      ctx.drawImage(overlayCanvas, 0, 0)
 
       // -- Typography --
-      const fontFamily = '\'Geist Mono\', monospace'
-
-      // Title: DEEP LISTEN
-      ctx.font = `600 16px ${fontFamily}`
+      ctx.font = fontTitle
       ctx.textAlign = 'left'
       ctx.textBaseline = 'top'
       ctx.letterSpacing = '6px'
-      // Dark background behind title
-      const titleMetrics = ctx.measureText('DEEP LISTEN')
-      const titleW = titleMetrics.width + 8
       ctx.fillStyle = 'rgba(0, 0, 0, 0.55)'
-      ctx.fillRect(34, 35, titleW + 12, 24)
+      ctx.fillRect(titleX - 6, 35, cachedTitleW + 12, 24)
       ctx.fillStyle = 'rgba(160, 220, 230, 0.85)'
-      ctx.fillText('DEEP LISTEN', 40, 38)
+      ctx.fillText('ORCASOUND HYDROPHONES', titleX, 38)
       ctx.letterSpacing = '0px'
 
-      // Current node name
+      ctx.font = fontSubtitle
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.55)'
+      ctx.fillRect(titleX - 6, 61, cachedSubtitleW + 12, 16)
+      ctx.fillStyle = 'rgba(160, 220, 230, 0.55)'
+      ctx.fillText(subtitleText, titleX, 63)
+
       const activeNode = NODES[activeNodeIndex]
       if (activeNode) {
-        ctx.font = `500 12px ${fontFamily}`
-        const nodeMetrics = ctx.measureText(activeNode.name)
+        ctx.font = fontNode
+        const nodeW = cachedNodeWidths.get(activeNode.id) ?? 0
         ctx.fillStyle = 'rgba(0, 0, 0, 0.55)'
-        ctx.fillRect(34, 61, nodeMetrics.width + 12, 18)
+        ctx.fillRect(titleX - 6, 79, nodeW + 12, 18)
         ctx.fillStyle = 'rgba(160, 220, 230, 0.75)'
-        ctx.fillText(activeNode.name, 40, 64)
+        ctx.fillText(activeNode.name, titleX, 82)
       }
 
-      // Frequency markers on left edge
-      ctx.font = `500 13px ${fontFamily}`
+      ctx.font = fontFreq
       ctx.textBaseline = 'middle'
       for (const label of freqLabels) {
         if (label.y > MARGIN_TOP + 10 && label.y < HEIGHT - MARGIN_BOTTOM - 10) {
-          // Dark background behind frequency label
-          const labelMetrics = ctx.measureText(label.text)
+          const labelW = cachedLabelWidths.get(label.text) ?? 0
           ctx.fillStyle = 'rgba(0, 0, 0, 0.55)'
-          ctx.fillRect(2, label.y - 9, labelMetrics.width + 12, 18)
+          ctx.fillRect(2, label.y - 9, labelW + 12, 18)
           ctx.fillStyle = 'rgba(160, 220, 230, 0.80)'
           ctx.fillText(label.text, 8, label.y)
-          // Tick mark extending into spectrogram
           ctx.beginPath()
           ctx.strokeStyle = 'rgba(160, 220, 230, 0.35)'
           ctx.lineWidth = 1
           ctx.moveTo(0, label.y)
-          ctx.lineTo(labelMetrics.width + 18, label.y)
+          ctx.lineTo(labelW + 18, label.y)
           ctx.stroke()
         }
       }
 
-      // UTC time — bottom right
-      const utcNow = new Date()
-      const timeStr = utcNow.toISOString().slice(11, 19) + ' UTC'
-      ctx.font = `500 12px ${fontFamily}`
+      const timeStr = getTimeStr(now)
+      ctx.font = fontTime
       ctx.textAlign = 'right'
       ctx.textBaseline = 'bottom'
-      // Dark background behind UTC time
-      const timeMetrics = ctx.measureText(timeStr)
       ctx.fillStyle = 'rgba(0, 0, 0, 0.55)'
-      ctx.fillRect(WIDTH - 46 - timeMetrics.width, HEIGHT - 56, timeMetrics.width + 12, 20)
+      ctx.fillRect(WIDTH - 46 - cachedTimeW, HEIGHT - 56, cachedTimeW + 12, 20)
       ctx.fillStyle = 'rgba(160, 220, 230, 0.80)'
       ctx.fillText(timeStr, WIDTH - 40, HEIGHT - 40)
       ctx.textAlign = 'left'

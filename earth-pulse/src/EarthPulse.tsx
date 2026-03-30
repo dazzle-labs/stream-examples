@@ -790,12 +790,12 @@ export function EarthPulse() {
 
     // Real flights only — render global + regional, extrapolate from last known data
     const allFlights = globalFlights.length > 0 ? globalFlights : regionalFlights
+    const realNow = Date.now()
     for (const f of allFlights) {
-      const realNow = Date.now()
       const [lat, lon, heading] = extrapolateFlight(f, realNow)
       if (Math.abs(lat) > 78) continue
       const [x, y, vis, cosC] = ortho(lat, lon, cLon)
-      if (!vis) continue
+      if (!vis || cosC < 0.15) continue
 
       const [tLat, tLon] = extrapolateFlight(f, realNow - 3000)
       const [tx, ty, tVis] = ortho(tLat, tLon, cLon)
@@ -809,47 +809,47 @@ export function EarthPulse() {
       })
     }
 
-    // Draw from back to front
-    const chevronLen = 5.5
-    const chevronWing = 3.2
+    // Draw from back to front — per-flight alpha fades near the horizon
+    const chevronLen = 4.5
+    const chevronWing = 2.6
 
-    for (let b = 0; b < 4; b++) {
-      const bin = brightBins[b]!
-      if (bin.length === 0) continue
-      const alpha = 0.15 + b * 0.08
+    // Collect all visible flights into a flat list sorted by cosC (back to front)
+    const allVisible: VisibleFlight[] = []
+    for (const bin of brightBins) {
+      for (const f of bin) allVisible.push(f)
+    }
+    allVisible.sort((a, b) => a.cosC - b.cosC)
 
-      // Trails
+    // Smooth horizon fade: 0 at cosC=0.15, full at cosC=0.5
+    ctx.lineWidth = 0.5
+    for (const f of allVisible) {
+      const horizonFade = Math.min(1, (f.cosC - 0.15) / 0.35)
+      const a = horizonFade * (0.1 + f.cosC * 0.15)
+
+      // Trail
       ctx.beginPath()
-      for (const f of bin) {
-        ctx.moveTo(f.tx, f.ty)
-        ctx.lineTo(f.x, f.y)
-      }
-      ctx.strokeStyle = `rgba(255, 220, 180, ${alpha * 0.5})`
-      ctx.lineWidth = 1
+      ctx.moveTo(f.tx, f.ty)
+      ctx.lineTo(f.x, f.y)
+      ctx.strokeStyle = `rgba(255, 220, 180, ${a * 0.3})`
       ctx.stroke()
 
-      // Chevrons
-      ctx.beginPath()
-      for (const f of bin) {
-        const cos = Math.cos(f.angle)
-        const sin = Math.sin(f.angle)
-        // Nose (front tip)
-        const nx = f.x + cos * chevronLen
-        const ny = f.y + sin * chevronLen
-        // Left wing
-        const lx = f.x - cos * chevronLen * 0.3 + sin * chevronWing
-        const ly = f.y - sin * chevronLen * 0.3 - cos * chevronWing
-        // Right wing
-        const rx = f.x - cos * chevronLen * 0.3 - sin * chevronWing
-        const ry = f.y - sin * chevronLen * 0.3 + cos * chevronWing
+      // Chevron
+      const cos = Math.cos(f.angle)
+      const sin = Math.sin(f.angle)
+      const nx = f.x + cos * chevronLen
+      const ny = f.y + sin * chevronLen
+      const lx = f.x - cos * chevronLen * 0.3 + sin * chevronWing
+      const ly = f.y - sin * chevronLen * 0.3 - cos * chevronWing
+      const rx = f.x - cos * chevronLen * 0.3 - sin * chevronWing
+      const ry = f.y - sin * chevronLen * 0.3 + cos * chevronWing
 
-        ctx.moveTo(nx, ny)
-        ctx.lineTo(lx, ly)
-        ctx.lineTo(f.x - cos * chevronLen * 0.1, f.y - sin * chevronLen * 0.1)
-        ctx.lineTo(rx, ry)
-        ctx.lineTo(nx, ny)
-      }
-      ctx.fillStyle = `rgba(255, 230, 200, ${alpha + 0.15})`
+      ctx.beginPath()
+      ctx.moveTo(nx, ny)
+      ctx.lineTo(lx, ly)
+      ctx.lineTo(f.x - cos * chevronLen * 0.1, f.y - sin * chevronLen * 0.1)
+      ctx.lineTo(rx, ry)
+      ctx.closePath()
+      ctx.fillStyle = `rgba(255, 230, 200, ${a})`
       ctx.fill()
     }
 
