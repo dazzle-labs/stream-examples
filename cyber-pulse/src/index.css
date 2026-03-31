@@ -1,0 +1,67 @@
+@import 'tailwindcss';
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:ital,wght@0,100..800;1,100..800&display=swap');
+
+@theme {
+  --color-canvas: #010208;
+  --color-accent-cyan: #00e5ff;
+  --color-accent-magenta: #ff006e;
+  --color-accent-amber: #ffbe0b;
+  --color-accent-green: #06d6a0;
+  --color-accent-red: #ef233c;
+  --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, monospace;
+}
+
+body {
+  font-family: var(--font-mono);
+  background: #010208;
+  color: #e0e0e0;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+@keyframes ticker-scroll {
+  0% {
+    transform: translateX(0);
+  }
+  100% {
+    transform: translateX(-50%);
+  }
+}
+
+@keyframes breathing {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.4;
+  }
+}
+
+@keyframes noise-flash {
+  0% {
+    opacity: 0.2;
+  }
+  50% {
+    opacity: 0.08;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+.ticker-scroll {
+  animation: ticker-scroll 60s linear infinite;
+}
+
+.breathing {
+  animation: breathing 3s ease-in-out infinite;
+}
+
+.noise-flash {
+  animation: noise-flash 150ms ease-out forwards;
+}
+
+.noise-bg {
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  background-size: 256px 256px;
+}
