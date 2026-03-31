@@ -1,6 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { Headline } from '../types'
-import { googleNewsUrl, centcomUrl } from '../api'
 
 const POLL_INTERVAL = 5 * 60 * 1000
 
@@ -38,7 +37,7 @@ function parseRssXml(xml: string, defaultCategory: Headline['category'], default
 async function fetchGoogleNews(): Promise<Headline[]> {
   try {
     const response = await fetch(
-      googleNewsUrl('/rss/search?q=%22strait+of+hormuz%22+OR+%22hormuz%22+when%3A1d&hl=en-US&gl=US&ceid=US:en'),
+      'https://news.google.com/rss/search?q=%22strait+of+hormuz%22+OR+%22hormuz%22+when%3A1d&hl=en-US&gl=US&ceid=US:en',
     )
     if (!response.ok) return []
     const xml = await response.text()
@@ -51,7 +50,7 @@ async function fetchGoogleNews(): Promise<Headline[]> {
 async function fetchCentcom(): Promise<Headline[]> {
   try {
     const response = await fetch(
-      centcomUrl('/DesktopModules/ArticleCS/RSS.ashx?ContentType=1&Site=808&max=10'),
+      'https://www.centcom.mil/DesktopModules/ArticleCS/RSS.ashx?ContentType=1&Site=808&max=10',
     )
     if (!response.ok) return []
     const xml = await response.text()

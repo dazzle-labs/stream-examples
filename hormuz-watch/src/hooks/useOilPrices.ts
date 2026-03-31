@@ -1,6 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { CommodityPrice } from '../types'
-import { yahooUrl } from '../api'
 
 const PRE_CRISIS_BASELINES: Record<string, number> = {
   'BZ=F': 74.35,
@@ -15,7 +14,7 @@ const POLL_INTERVAL = 5 * 60 * 1000
 
 async function fetchYahoo(ticker: string): Promise<CommodityPrice | null> {
   try {
-    const response = await fetch(yahooUrl(`/v8/finance/chart/${ticker}?range=7d&interval=1d`))
+    const response = await fetch(`https://query1.finance.yahoo.com/v8/finance/chart/${ticker}?range=7d&interval=1d`)
     if (!response.ok) return null
 
     const json = await response.json()

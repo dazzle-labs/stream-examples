@@ -28,7 +28,6 @@ const STORAGE_KEY = 'hormuz-watch-vessels'
 const STALE_VESSEL_TIMEOUT = 12 * 60 * 60 * 1000
 const RECONNECT_DELAY = 5000
 const SAVE_THROTTLE = 5000
-const isDev = import.meta.env.DEV
 
 function loadFromStorage(): Map<string, Vessel> {
   try {
@@ -161,10 +160,7 @@ export function useVesselStream(): {
     setConnectionStatus('connecting')
 
     try {
-      const wsUrl = isDev
-        ? `ws://${window.location.hostname}:5198`
-        : 'wss://stream.aisstream.io/v0/stream'
-      const socket = new WebSocket(wsUrl)
+      const socket = new WebSocket('wss://stream.aisstream.io/v0/stream')
       websocketRef.current = socket
 
       socket.onopen = () => {
