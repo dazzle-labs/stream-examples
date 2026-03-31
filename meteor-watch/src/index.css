@@ -1,0 +1,130 @@
+@import 'tailwindcss';
+
+@theme {
+  --color-meteor-slow: #60a5fa;
+  --color-meteor-medium: #22d3ee;
+  --color-meteor-fast: #e8e4df;
+  --color-meteor-hot: #f97316;
+  --color-fireball: #fbbf24;
+  --color-accent: #f59e0b;
+  --color-surface: #0a0a0f;
+  --color-text-primary: #e8e4df;
+  --color-text-dim: #5a5040;
+  --font-display: 'Inter', sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, monospace;
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html, body, #root {
+  width: 100vw;
+  height: 100vh;
+  overflow: hidden;
+  background: var(--color-surface);
+  color: var(--color-text-primary);
+  font-family: var(--font-display);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* --- Broadcast keyframes --- */
+
+@keyframes live-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.2; }
+}
+
+@keyframes breathe {
+  0%, 100% { opacity: 0.7; }
+  50% { opacity: 1; }
+}
+
+@keyframes scan-line {
+  0% { transform: translateY(-100%); }
+  100% { transform: translateY(720px); }
+}
+
+@keyframes glow-pulse {
+  0%, 100% { box-shadow: 0 0 8px 1px rgba(245, 158, 11, 0.15), inset 0 0 4px rgba(245, 158, 11, 0.05); }
+  50% { box-shadow: 0 0 16px 3px rgba(245, 158, 11, 0.3), inset 0 0 8px rgba(245, 158, 11, 0.1); }
+}
+
+@keyframes vignette-breathe {
+  0%, 100% { opacity: 0.85; }
+  50% { opacity: 1; }
+}
+
+@keyframes fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes fade-out {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+
+@keyframes fade-up {
+  from {
+    transform: translateY(12px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+@keyframes fireball-flash {
+  from { opacity: 0.6; }
+  to { opacity: 0; }
+}
+
+@keyframes signal-tick {
+  0%, 100% { opacity: 0.3; }
+  50% { opacity: 0.8; }
+}
+
+.animate-live-pulse {
+  animation: live-pulse 2s ease-in-out infinite;
+}
+
+.animate-breathe {
+  animation: breathe 4s ease-in-out infinite;
+}
+
+.animate-scan-line {
+  animation: scan-line 8s ease-in-out infinite;
+}
+
+.animate-glow-pulse {
+  animation: glow-pulse 4s ease-in-out infinite;
+}
+
+.animate-vignette-breathe {
+  animation: vignette-breathe 6s ease-in-out infinite;
+}
+
+.animate-fade-in {
+  animation: fade-in 0.4s ease-in-out forwards;
+}
+
+.animate-fade-out {
+  animation: fade-out 0.4s ease-in-out forwards;
+}
+
+.animate-fade-up {
+  animation: fade-up 0.6s ease-in-out forwards;
+}
+
+.animate-fireball-flash {
+  animation: fireball-flash 0.5s ease-in-out forwards;
+}
+
+.animate-signal-tick {
+  animation: signal-tick 3s ease-in-out infinite;
+}
