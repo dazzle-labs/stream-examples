@@ -200,9 +200,50 @@ export function useVesselStream(): {
     }
   }, [processMessage])
 
+  const handleVesselEvent = useCallback((event: Event) => {
+    try {
+      const detail = (event as CustomEvent).detail
+      if (!detail) return
+
+      const parsed = typeof detail === 'string' ? JSON.parse(detail) : detail
+      if (parsed.type === 'vessel-batch' && Array.isArray(parsed.vessels)) {
+        const incoming: Vessel[] = parsed.vessels
+          .filter((vessel: Vessel) =>
+            vessel.latitude >= REGION_BOUNDS.minLat && vessel.latitude <= REGION_BOUNDS.maxLat
+            && vessel.longitude >= REGION_BOUNDS.minLon && vessel.longitude <= REGION_BOUNDS.maxLon,
+          )
+          .map((vessel: Vessel) => ({
+            ...vessel,
+            trail: [[vessel.longitude, vessel.latitude] as [number, number]],
+            timestamp: vessel.timestamp || Date.now(),
+          }))
+
+        if (incoming.length > 0) {
+          setConnectionStatus('connected')
+          setVessels(previous => {
+            const updated = new Map(previous)
+            for (const vessel of incoming) {
+              const existing = updated.get(vessel.mmsi)
+              const trail = existing
+                ? [...existing.trail.slice(-9), [vessel.longitude, vessel.latitude] as [number, number]]
+                : [[vessel.longitude, vessel.latitude] as [number, number]]
+              updated.set(vessel.mmsi, { ...vessel, trail })
+            }
+            throttledSave(updated)
+            return updated
+          })
+        }
+      }
+    } catch {
+      // ignore
+    }
+  }, [throttledSave])
+
   useEffect(() => {
     mountedRef.current = true
     connect()
+
+    window.addEventListener('vessel-update', handleVesselEvent)
 
     staleCleanupRef.current = setInterval(() => {
       const cutoff = Date.now() - STALE_VESSEL_TIMEOUT
@@ -219,6 +260,7 @@ export function useVesselStream(): {
 
     return () => {
       mountedRef.current = false
+      window.removeEventListener('vessel-update', handleVesselEvent)
       if (websocketRef.current) { websocketRef.current.close(); websocketRef.current = null }
       if (staleCleanupRef.current) { clearInterval(staleCleanupRef.current) }
       if (reconnectRef.current) { clearTimeout(reconnectRef.current) }
