@@ -2,34 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import { Headline } from '../types'
 import { googleNewsUrl, centcomUrl } from '../api'
 
-const CURATED_HEADLINES: Array<{ source: string, category: Headline['category'], title: string }> = [
-  { source: 'CENTCOM', category: 'military', title: 'CENTCOM destroys 44 Iranian mine-laying vessels in Strait of Hormuz campaign' },
-  { source: 'Reuters', category: 'news', title: 'Iran rejects US 15-point peace proposal, demands sovereignty recognition' },
-  { source: 'Al Jazeera', category: 'news', title: 'IRGC charges $2M per ship in yuan for tolled Hormuz passage' },
-  { source: 'CNBC', category: 'news', title: 'Brent crude holds above $115 as Hormuz blockade enters second month' },
-  { source: 'CENTCOM', category: 'military', title: 'USS Eisenhower carrier strike group repositions to Gulf of Oman' },
-  { source: 'AP', category: 'news', title: 'Pakistan mediates indirect ceasefire talks between US and Iran' },
-  { source: 'Lloyd\'s List', category: 'news', title: 'War-risk insurance premiums surge to 10% of hull value for strait transits' },
-  { source: 'CENTCOM', category: 'military', title: 'A-10 Warthogs neutralize Iranian fast-attack boats near Bandar Abbas' },
-  { source: 'Reuters', category: 'news', title: 'IEA releases 400M barrels from strategic petroleum reserves' },
-  { source: 'USNI News', category: 'military', title: 'IRGC opens selective passage around Larak Island for approved nations' },
-  { source: 'CNBC', category: 'news', title: 'Supertanker day rates hit record $800,000 amid Hormuz disruption' },
-  { source: 'Al Jazeera', category: 'news', title: 'Trump sets April 6 deadline for Iran to accept deal or face energy strikes' },
-]
-
 const POLL_INTERVAL = 5 * 60 * 1000
-
-function buildFallbackHeadlines(): Headline[] {
-  const now = Date.now()
-  const spacing = (3 * 60 * 60 * 1000) / CURATED_HEADLINES.length
-  return CURATED_HEADLINES.map((seed, index) => ({
-    id: `curated-${index}`,
-    title: seed.title,
-    source: seed.source,
-    category: seed.category,
-    timestamp: now - index * spacing,
-  }))
-}
 
 function parseRssXml(xml: string, defaultCategory: Headline['category'], defaultSource?: string): Headline[] {
   try {
@@ -92,7 +65,7 @@ export function useNewsFeed(): {
   headlines: Headline[]
   loading: boolean
 } {
-  const [headlines, setHeadlines] = useState<Headline[]>(() => buildFallbackHeadlines())
+  const [headlines, setHeadlines] = useState<Headline[]>([])
   const [loading, setLoading] = useState(true)
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const counterRef = useRef(0)
@@ -141,7 +114,17 @@ export function useNewsFeed(): {
       setHeadlines(previous => [newHeadline, ...previous].slice(0, 20))
     }
 
+    function handleNewsUpdate(event: Event) {
+      const detail = (event as CustomEvent).detail
+      const parsed = typeof detail === 'string' ? JSON.parse(detail) : detail
+      if (parsed?.headlines && Array.isArray(parsed.headlines)) {
+        setHeadlines(parsed.headlines.slice(0, 15))
+        setLoading(false)
+      }
+    }
+
     window.addEventListener('hormuz-headline', handleHeadline)
+    window.addEventListener('news-update', handleNewsUpdate)
 
     return () => {
       if (intervalRef.current) {
@@ -149,6 +132,7 @@ export function useNewsFeed(): {
         intervalRef.current = null
       }
       window.removeEventListener('hormuz-headline', handleHeadline)
+      window.removeEventListener('news-update', handleNewsUpdate)
     }
   }, [fetchAll])
 
