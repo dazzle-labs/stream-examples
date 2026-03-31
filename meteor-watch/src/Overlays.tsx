@@ -30,11 +30,21 @@ function galacticPlaneDec(raDeg: number): number {
 
 export function TitleBar({ stats }: { stats: MeteorStats }) {
   const [utcTime, setUtcTime] = useState(() => formatUTC())
+  const [sinceUpdate, setSinceUpdate] = useState('')
 
   useEffect(() => {
-    const id = setInterval(() => setUtcTime(formatUTC()), 1000)
+    const tick = () => {
+      setUtcTime(formatUTC())
+      if (stats.lastUpdated > 0) {
+        const agoSec = Math.round((Date.now() - stats.lastUpdated) / 1000)
+        if (agoSec < 60) setSinceUpdate(`${agoSec}s ago`)
+        else setSinceUpdate(`${Math.floor(agoSec / 60)}m ago`)
+      }
+    }
+    tick()
+    const id = setInterval(tick, 1000)
     return () => clearInterval(id)
-  }, [])
+  }, [stats.lastUpdated])
 
   return (
     <div
@@ -95,6 +105,9 @@ export function TitleBar({ stats }: { stats: MeteorStats }) {
         style={{ fontSize: 14, color: 'var(--color-text-dim)', letterSpacing: '0.06em' }}
       >
         {stats.totalCount.toLocaleString()} meteors tracked
+        <span style={{ margin: '0 10px', opacity: 0.3 }}>|</span>
+        {sinceUpdate && (<>updated {sinceUpdate}<span style={{ margin: '0 10px', opacity: 0.3 }}>|</span></>)}
+        next in {stats.refreshIntervalMin}m
         <span style={{ margin: '0 10px', opacity: 0.3 }}>|</span>
         {utcTime} UTC
       </span>
@@ -496,16 +509,40 @@ function computeDensityGrid(points: readonly MeteorPoint[]): ComputedDensity {
   return { grid, clusters, maxCount, globalMinTime: globalMinTime, globalMaxTime: globalMaxTime }
 }
 
-export function RadiantMap({ points }: { points: readonly MeteorPoint[] }) {
+interface RadiantMapProps {
+  points: readonly MeteorPoint[]
+  onClusterCountChange?: (count: number) => void
+}
+
+export function RadiantMap({ points, onClusterCountChange }: RadiantMapProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const animRef = useRef<number>(0)
   const densityRef = useRef<ComputedDensity | null>(null)
-  const prevPointsLenRef = useRef<number>(0)
+  const prevPointsRef = useRef<readonly MeteorPoint[]>([])
 
-  // Recompute density grid only when data changes
-  if (points.length !== prevPointsLenRef.current) {
-    prevPointsLenRef.current = points.length
+  // Cluster reveal timestamps: keyed by "name-count" to detect new clusters
+  const clusterRevealRef = useRef<Map<string, number>>(new Map())
+
+  // Data refresh sweep state
+  const sweepRef = useRef<number>(0) // timestamp when sweep started, 0 = inactive
+
+  // Recompute density grid when the points array reference changes
+  if (points !== prevPointsRef.current) {
+    const hadPoints = prevPointsRef.current.length > 0
+    prevPointsRef.current = points
+    const prevClusterCount = densityRef.current?.clusters.length ?? 0
     densityRef.current = points.length > 0 ? computeDensityGrid(points) : null
+    const newClusterCount = densityRef.current?.clusters.length ?? 0
+
+    // Notify parent of cluster count changes
+    if (newClusterCount > prevClusterCount && onClusterCountChange) {
+      onClusterCountChange(newClusterCount)
+    }
+
+    // Trigger data refresh sweep if this is an update (not initial load)
+    if (hadPoints && points.length > 0) {
+      sweepRef.current = performance.now()
+    }
   }
 
   const draw = useCallback((time: number) => {
@@ -719,18 +756,32 @@ export function RadiantMap({ points }: { points: readonly MeteorPoint[] }) {
 
       ctx.globalCompositeOperation = 'source-over'
 
-      // Render cluster highlights
+      // Render cluster highlights with reveal animation
       const clusterPulse = Math.sin(time * 0.002) * 0.5 + 0.5
+      const revealMap = clusterRevealRef.current
 
       for (let ci = 0; ci < Math.min(clusters.length, 6); ci++) {
         const cluster = clusters[ci]
         if (!cluster) continue
+
+        // Track reveal time per cluster
+        const clusterKey = `${cluster.name}-${cluster.centerRA.toFixed(0)}-${cluster.centerDec.toFixed(0)}`
+        if (!revealMap.has(clusterKey)) {
+          revealMap.set(clusterKey, time)
+        }
+        const revealTime = revealMap.get(clusterKey) ?? time
+        const revealAge = (time - revealTime) / 1000 // seconds since reveal
+
         const [cx, cy] = toXY(cluster.centerRA, cluster.centerDec)
 
         // Convert radius from degrees to pixels (approximate)
         const radiusPixelsX = (cluster.radius / 360) * chartW
         const radiusPixelsY = (cluster.radius / 180) * chartH
         const radiusPx = Math.max(radiusPixelsX, radiusPixelsY, 12)
+
+        // Animated ring: arc grows from 0 to 2*PI over first 3 seconds
+        const ringProgress = Math.min(1, revealAge / 3)
+        const ringArc = ringProgress * Math.PI * 2
 
         // Dashed circle around cluster
         const ringAlpha = cluster.isActive
@@ -744,12 +795,14 @@ export function RadiantMap({ points }: { points: readonly MeteorPoint[] }) {
         ctx.lineWidth = cluster.isActive ? 1.5 : 1
         ctx.setLineDash([4, 4])
         ctx.beginPath()
-        ctx.ellipse(cx, cy, radiusPx, radiusPx * 0.8, 0, 0, Math.PI * 2)
+        ctx.ellipse(cx, cy, radiusPx, radiusPx * 0.8, 0, 0, ringArc)
         ctx.stroke()
         ctx.setLineDash([])
 
+        // Only show labels after ring starts appearing
+        if (ringProgress < 0.1) continue
+
         // Callout line and label
-        // Position label to the upper-right of the cluster, offset based on index
         const labelOffsetX = 20 + radiusPx
         const labelOffsetY = -10 - ci * 6
         const labelX = cx + labelOffsetX
@@ -759,15 +812,16 @@ export function RadiantMap({ points }: { points: readonly MeteorPoint[] }) {
         const clampedLabelX = Math.min(Math.max(labelX, padX + 60), padX + chartW - 180)
         const clampedLabelY = Math.min(Math.max(labelY, padTop + 20), padTop + chartH - 50)
 
-        // Callout line
-        ctx.strokeStyle = `rgba(245, 158, 11, ${0.2 + 0.1 * clusterPulse})`
+        // Callout line with fade-in
+        const calloutAlpha = Math.min(1, ringProgress * 2)
+        ctx.strokeStyle = `rgba(245, 158, 11, ${(0.2 + 0.1 * clusterPulse) * calloutAlpha})`
         ctx.lineWidth = 0.5
         ctx.beginPath()
         ctx.moveTo(cx + radiusPx * 0.7, cy - radiusPx * 0.3)
         ctx.lineTo(clampedLabelX, clampedLabelY + 8)
         ctx.stroke()
 
-        // Label background panel
+        // Label content
         const labelLine1 = cluster.name.toUpperCase()
         const labelLine2 = `${cluster.count} meteors  ${cluster.avgVelocity} km/s`
         const labelLine3 = formatTimeWindow(cluster.oldestTime, cluster.newestTime)
@@ -802,8 +856,8 @@ export function RadiantMap({ points }: { points: readonly MeteorPoint[] }) {
         ctx.font = '9px "JetBrains Mono", monospace'
         ctx.fillText(labelLine3, clampedLabelX + 4, clampedLabelY + 33)
 
-        // "ACTIVE" badge for unknown clusters
-        if (cluster.isActive) {
+        // "ACTIVE" badge
+        if (cluster.isActive && revealAge > 2) {
           const badgeX = clampedLabelX + panelW + 4
           const badgeText = 'ACTIVE'
           ctx.font = '8px "JetBrains Mono", monospace'
@@ -900,6 +954,88 @@ export function RadiantMap({ points }: { points: readonly MeteorPoint[] }) {
     ctx.font = '8px "JetBrains Mono", monospace'
     ctx.fillStyle = 'rgba(255, 255, 255, 0.25)'
     ctx.fillText('BRIGHTER = NEWER DATA', legendX, scaleY + 52)
+
+    // ── Post-processing ──
+
+    // Bloom: for top-5% density cells, draw a large blurred radial glow
+    if (density && density.maxCount > 0) {
+      const { grid: dGrid, maxCount: dMax } = density
+      const bloomThreshold = 0.95
+      ctx.globalCompositeOperation = 'lighter'
+
+      for (let di = 0; di < DEC_BINS; di++) {
+        for (let ri = 0; ri < RA_BINS; ri++) {
+          const cell = gridAt(dGrid, di, ri)
+          if (cell.count === 0) continue
+          const t = cell.count / dMax
+          if (t < bloomThreshold) continue
+
+          const cellRA = (ri + 0.5) * BIN_RA
+          const cellDec = (di + 0.5) * BIN_DEC - 90
+          const [bx, by] = toXY(cellRA, cellDec)
+
+          const cellPixW = chartW / RA_BINS
+          const cellPixH = chartH / DEC_BINS
+          const bloomRadius = Math.max(cellPixW, cellPixH) * 3
+
+          const bloomGrad = ctx.createRadialGradient(bx, by, 0, bx, by, bloomRadius)
+          bloomGrad.addColorStop(0, 'rgba(255, 220, 160, 0.02)')
+          bloomGrad.addColorStop(0.5, 'rgba(255, 180, 100, 0.008)')
+          bloomGrad.addColorStop(1, 'rgba(255, 160, 80, 0)')
+          ctx.fillStyle = bloomGrad
+          ctx.fillRect(bx - bloomRadius, by - bloomRadius, bloomRadius * 2, bloomRadius * 2)
+        }
+      }
+      ctx.globalCompositeOperation = 'source-over'
+    }
+
+    // Data refresh sweep: horizontal scan line sweeping left-to-right over 1 second
+    const sweepStart = sweepRef.current
+    if (sweepStart > 0) {
+      const sweepAge = (time - sweepStart) / 1000
+      if (sweepAge < 1) {
+        const sweepX = padX + sweepAge * chartW
+        const sweepAlpha = 0.15 * (1 - sweepAge)
+
+        ctx.strokeStyle = `rgba(34, 211, 238, ${sweepAlpha})`
+        ctx.lineWidth = 1
+        ctx.beginPath()
+        ctx.moveTo(sweepX, padTop)
+        ctx.lineTo(sweepX, padTop + chartH)
+        ctx.stroke()
+
+        // Trailing glow
+        const trailGrad = ctx.createLinearGradient(sweepX - 40, 0, sweepX, 0)
+        trailGrad.addColorStop(0, 'rgba(34, 211, 238, 0)')
+        trailGrad.addColorStop(1, `rgba(34, 211, 238, ${sweepAlpha * 0.3})`)
+        ctx.fillStyle = trailGrad
+        ctx.fillRect(sweepX - 40, padTop, 40, chartH)
+      } else {
+        sweepRef.current = 0
+      }
+    }
+
+    // Canvas vignette (secondary layer, subtle)
+    const vigGrad = ctx.createRadialGradient(w / 2, h / 2, h * 0.25, w / 2, h / 2, h * 0.75)
+    vigGrad.addColorStop(0, 'rgba(0, 0, 0, 0)')
+    vigGrad.addColorStop(1, 'rgba(0, 0, 0, 0.15)')
+    ctx.fillStyle = vigGrad
+    ctx.fillRect(0, 0, w, h)
+
+    // Dithering: faint 1-bit noise to reduce color banding
+    // Sparse sampling (every 8px) for performance
+    for (let ny = 0; ny < h; ny += 8) {
+      for (let nx = 0; nx < w; nx += 8) {
+        const v = hash(nx + ((time * 0.003) | 0), ny + ((time * 0.002) | 0))
+        // +-1/255 noise, rendered as very faint white or black dots
+        if (v > 0.5) {
+          ctx.fillStyle = `rgba(255, 255, 255, ${(v - 0.5) * 0.008})`
+        } else {
+          ctx.fillStyle = `rgba(0, 0, 0, ${(0.5 - v) * 0.008})`
+        }
+        ctx.fillRect(nx, ny, 8, 8)
+      }
+    }
 
     // Request next frame
     animRef.current = requestAnimationFrame(draw)

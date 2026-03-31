@@ -3,9 +3,33 @@ import type { MeteorPoint, MeteorStats, ShowerCount } from './types'
 import { fetchGmnMeteors, gmnToPoint } from './api'
 import { getActiveShower } from './showers'
 
-const REFETCH_INTERVAL = 30 * 60 * 1000
+const REFETCH_INTERVAL_MIN = 30
+const REFETCH_INTERVAL_MS = REFETCH_INTERVAL_MIN * 60 * 1000
+const LS_KEY = 'meteor-watch-data'
+const LS_TS_KEY = 'meteor-watch-updated'
 
-function computeStats(points: readonly MeteorPoint[]): MeteorStats {
+function saveToStorage(points: readonly MeteorPoint[]): void {
+  try {
+    localStorage.setItem(LS_KEY, JSON.stringify(points))
+    localStorage.setItem(LS_TS_KEY, String(Date.now()))
+  } catch {
+    // Storage full or unavailable
+  }
+}
+
+function loadFromStorage(): { points: MeteorPoint[], updatedAt: number } | null {
+  try {
+    const raw = localStorage.getItem(LS_KEY)
+    const ts = localStorage.getItem(LS_TS_KEY)
+    if (!raw || !ts) return null
+    const points = JSON.parse(raw) as MeteorPoint[]
+    return { points, updatedAt: Number(ts) }
+  } catch {
+    return null
+  }
+}
+
+function computeStats(points: readonly MeteorPoint[], lastUpdated: number): MeteorStats {
   if (points.length === 0) {
     return {
       totalCount: 0,
@@ -14,6 +38,8 @@ function computeStats(points: readonly MeteorPoint[]): MeteorStats {
       brightestMag: 0,
       activeShower: getActiveShower(),
       dataAge: '',
+      lastUpdated,
+      refreshIntervalMin: REFETCH_INTERVAL_MIN,
     }
   }
 
@@ -33,7 +59,6 @@ function computeStats(points: readonly MeteorPoint[]): MeteorStats {
     .sort((a, b) => b.count - a.count)
     .slice(0, 6)
 
-  // Compute data age from oldest/newest timestamps
   const newest = points[0]?.timestamp ?? ''
   const oldest = points[points.length - 1]?.timestamp ?? ''
   const newestDate = new Date(newest.replace(' ', 'T') + 'Z')
@@ -48,6 +73,8 @@ function computeStats(points: readonly MeteorPoint[]): MeteorStats {
     brightestMag,
     activeShower: getActiveShower(),
     dataAge,
+    lastUpdated,
+    refreshIntervalMin: REFETCH_INTERVAL_MIN,
   }
 }
 
@@ -55,20 +82,28 @@ export function useMeteorData(): {
   points: readonly MeteorPoint[]
   stats: MeteorStats
 } {
-  const [points, setPoints] = useState<readonly MeteorPoint[]>([])
-  const [stats, setStats] = useState<MeteorStats>(() => computeStats([]))
+  const [points, setPoints] = useState<readonly MeteorPoint[]>(() => {
+    const cached = loadFromStorage()
+    return cached ? cached.points : []
+  })
+  const [stats, setStats] = useState<MeteorStats>(() => {
+    const cached = loadFromStorage()
+    return computeStats(cached?.points ?? [], cached?.updatedAt ?? 0)
+  })
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
   const load = useCallback(async () => {
     const raw = await fetchGmnMeteors()
     const mapped = raw.map(gmnToPoint)
+    const now = Date.now()
     setPoints(mapped)
-    setStats(computeStats(mapped))
+    setStats(computeStats(mapped, now))
+    saveToStorage(mapped)
   }, [])
 
   useEffect(() => {
     void load()
-    intervalRef.current = setInterval(() => { void load() }, REFETCH_INTERVAL)
+    intervalRef.current = setInterval(() => { void load() }, REFETCH_INTERVAL_MS)
     return () => {
       if (intervalRef.current) clearInterval(intervalRef.current)
     }

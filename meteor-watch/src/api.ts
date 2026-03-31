@@ -15,7 +15,7 @@ export async function fetchGmnMeteors(): Promise<GmnMeteor[]> {
 
   for (let page = 0; page < maxPages; page++) {
     try {
-      let url = 'https://explore.globalmeteornetwork.org/gmn_data_store/meteor.json?_size=1000&_sort_desc=beginning_utc_time&_shape=objects&_cors=1'
+      let url = 'https://explore.globalmeteornetwork.org/gmn_data_store/meteor.json?_size=1000&_sort_desc=beginning_utc_time&_shape=objects'
       if (nextCursor) {
         url += `&_next=${encodeURIComponent(nextCursor)}`
       }

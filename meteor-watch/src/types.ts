@@ -40,6 +40,8 @@ export interface MeteorStats {
   readonly brightestMag: number
   readonly activeShower: string | null
   readonly dataAge: string
+  readonly lastUpdated: number
+  readonly refreshIntervalMin: number
 }
 
 export interface ShowerCount {

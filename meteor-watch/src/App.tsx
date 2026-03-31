@@ -1,42 +1,76 @@
+import { useEffect, useRef, useCallback } from 'react'
 import { useMeteorData } from './useMeteorData'
-import { MeteorGlobe } from './MeteorGlobe'
 import { TitleBar, StatsBar, RadiantMap } from './Overlays'
+import { initAudio } from './sound'
+import { initParticles } from './particles'
+import type { AudioEngine } from './sound'
 
 export function App() {
   const { points, stats } = useMeteorData()
 
+  const audioRef = useRef<AudioEngine | null>(null)
+  const particleCanvasRef = useRef<HTMLCanvasElement>(null)
+  const rafRef = useRef<number>(0)
+  const lastTimeRef = useRef<number>(0)
+  const prevPointsLenRef = useRef<number>(0)
+
+  // Initialize audio engine on mount
+  useEffect(() => {
+    const engine = initAudio()
+    audioRef.current = engine
+    if (engine) {
+      engine.startDrone()
+    }
+  }, [])
+
+  // Initialize particle system when canvas is available
+  useEffect(() => {
+    const canvas = particleCanvasRef.current
+    if (!canvas) return
+
+    const system = initParticles(canvas)
+
+    // Particle animation loop
+    const tick = (time: number) => {
+      const dt = lastTimeRef.current > 0 ? time - lastTimeRef.current : 16
+      lastTimeRef.current = time
+
+      system.update(dt)
+      system.render()
+
+      rafRef.current = requestAnimationFrame(tick)
+    }
+
+    rafRef.current = requestAnimationFrame(tick)
+
+    return () => {
+      cancelAnimationFrame(rafRef.current)
+    }
+  }, [])
+
+  // Detect data refreshes and play tick sound
+  useEffect(() => {
+    if (points.length > 0 && prevPointsLenRef.current > 0 && points.length !== prevPointsLenRef.current) {
+      audioRef.current?.playTick()
+    }
+    prevPointsLenRef.current = points.length
+  }, [points])
+
+  // Cluster count increase triggers resolve sound
+  const handleClusterCountChange = useCallback(() => {
+    audioRef.current?.playClusterResolve()
+  }, [])
+
   return (
     <div className="relative w-[1280px] h-[720px] bg-black overflow-hidden">
-      {/* Full-screen radiant sky chart (the hero) */}
-      <RadiantMap points={points} />
+      <RadiantMap points={points} onClusterCountChange={handleClusterCountChange} />
 
-      {/* Small globe inset, bottom-left, with signal-lock corner brackets */}
-      <div
-        className="absolute z-10"
-        style={{
-          bottom: 48,
-          left: 20,
-          width: 252,
-          height: 252,
-        }}
-      >
-        {/* Corner brackets around globe */}
-        <GlobeCornerBrackets />
-
-        {/* Globe with pulsing border glow */}
-        <div
-          className="animate-glow-pulse"
-          style={{
-            position: 'absolute',
-            inset: 6,
-            borderRadius: '50%',
-            overflow: 'hidden',
-            border: '1px solid rgba(245, 158, 11, 0.15)',
-          }}
-        >
-          <MeteorGlobe points={points} />
-        </div>
-      </div>
+      {/* Particle layer (between chart and vignette) */}
+      <canvas
+        ref={particleCanvasRef}
+        className="absolute inset-0 z-10 pointer-events-none"
+        style={{ width: 1280, height: 720 }}
+      />
 
       {/* Animated vignette overlay */}
       <div
@@ -64,33 +98,8 @@ export function App() {
         />
       </div>
 
-      {/* Overlays */}
       <TitleBar stats={stats} />
       <StatsBar stats={stats} />
     </div>
-  )
-}
-
-/* ------------------------------------------------------------------ */
-/*  Corner brackets around the globe inset (signal lock style)         */
-/* ------------------------------------------------------------------ */
-
-function GlobeCornerBrackets() {
-  const bracketStyle = {
-    position: 'absolute' as const,
-    width: 16,
-    height: 16,
-    borderColor: 'rgba(245, 158, 11, 0.3)',
-    borderStyle: 'solid' as const,
-    borderWidth: 0,
-  }
-
-  return (
-    <>
-      <div style={{ ...bracketStyle, top: 0, left: 0, borderTopWidth: 1, borderLeftWidth: 1 }} />
-      <div style={{ ...bracketStyle, top: 0, right: 0, borderTopWidth: 1, borderRightWidth: 1 }} />
-      <div style={{ ...bracketStyle, bottom: 0, left: 0, borderBottomWidth: 1, borderLeftWidth: 1 }} />
-      <div style={{ ...bracketStyle, bottom: 0, right: 0, borderBottomWidth: 1, borderRightWidth: 1 }} />
-    </>
   )
 }
