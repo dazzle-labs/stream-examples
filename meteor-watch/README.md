@@ -1,12 +1,10 @@
 # Meteor Watch
 
-A 3D globe tracking meteors entering Earth's atmosphere in real time. Data from the Global Meteor Network (citizen science camera stations worldwide) and NASA CNEOS fireball database.
-
-Meteors animate as glowing streaks from entry to burnout, color-coded by velocity (blue for slow, cyan for medium, white for fast, orange for hypersonic). Major CNEOS fireballs trigger dramatic screen flashes with energy readouts.
+A full-screen radiant sky chart visualizing 10,000+ recent meteor detections from the Global Meteor Network. Shows where in space meteors are coming from, with automatic cluster detection highlighting active shower regions.
 
 ## Setup
 
-No API keys needed. Both data sources are completely free and open.
+No API keys needed. The GMN Datasette API is completely free and open.
 
 ```bash
 npm install
@@ -16,13 +14,14 @@ npm run dev
 ## Stack
 
 - React 19 + TypeScript + Tailwind 4 + Vite
-- Custom WebGL2 globe renderer (zero runtime deps beyond React)
-- Canvas2D overlay for meteor streak animation
+- Canvas2D density heatmap with cluster detection
+- Web Audio API for procedural ambient sound
 - Global Meteor Network Datasette API (~2,600 meteors/day)
-- NASA CNEOS Fireball API (major events with energy data)
 
 ## How It Works
 
-The globe rotates slowly (3-minute period) with a star field, warm amber graticule, and day/night terminator. Meteors are fetched in batches from GMN every 30 minutes and queued for playback at ~1 every 2.5 seconds. Each streak animates over 1.5 seconds (3 seconds for fireballs) from entry point to burnout point using the actual trajectory coordinates.
+Fetches 10,000 recent meteor observations from GMN (10 pages, refreshes every 30 minutes). Each meteor has a radiant (the point in the sky it appeared to come from), which is plotted on an equatorial sky chart as a density heatmap. Shower meteors (from known debris streams) cluster at specific radiant positions; random background debris is scattered across the sky.
 
-The overlay shows detection count, queue depth, active meteor shower info (when applicable), and per-event details (velocity, magnitude, shower association).
+Automatic cluster detection finds statistically anomalous concentrations, labels them with the matched shower name (or "Unknown source"), count, velocity, and active date range. Clusters with detections in the last 12 hours get an "ACTIVE" badge.
+
+Data persists to localStorage for instant rendering on reload. Procedural ambient sound (drone, data ticks, cluster resolve tones) via Web Audio API.
