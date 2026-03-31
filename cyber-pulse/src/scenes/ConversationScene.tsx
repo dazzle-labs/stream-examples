@@ -3,7 +3,7 @@ import { store } from '../data/store'
 import type { CommunityPost } from '../data/types'
 
 const WIDTH = 1280
-const HEIGHT = 720
+const HEIGHT = 652
 const FONT = "'JetBrains Mono', monospace"
 const CVE_REGEX = /CVE-\d{4}-\d{4,}/g
 
