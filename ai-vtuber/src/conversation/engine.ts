@@ -76,7 +76,7 @@ const DEFAULT_API_BASE = 'https://openrouter.ai/api/v1'
 const DEFAULT_MODEL = 'anthropic/claude-haiku-4.5'
 const MAX_TOKENS = 200
 const MAX_HISTORY = 6
-const IDLE_TIMEOUT_MS = 30_000
+const IDLE_TIMEOUT_MS = 15_000
 
 export class ConversationEngine {
   private running = false
