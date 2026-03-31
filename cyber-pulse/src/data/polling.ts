@@ -735,7 +735,8 @@ async function pollNvdCves() {
         cve => cve.severity === 'critical' && !store.feedQueue.some(item => item.id === cve.id),
       )
       for (const cve of newCritical) {
-        addTickerEvent('NVD', `New critical CVE: ${cve.id} (CVSS ${cve.cvssScore})`, 'critical')
+        const shortDescription = cve.description.length > 60 ? cve.description.slice(0, 60) + '...' : cve.description
+        addTickerEvent('NVD', `${cve.id} (CVSS ${cve.cvssScore}) ${cve.vendorProject ? cve.vendorProject + ': ' : ''}${shortDescription}`, 'critical')
       }
     }
 
@@ -842,7 +843,11 @@ async function pollOoni() {
   try {
     const text = await fetchText('https://api.ooni.io/api/v1/incidents/search?limit=10&only_ongoing=true')
     if (!text) return
-    const incidents = parseOoni(text)
+    const sevenDaysAgo = Date.now() - 7 * 24 * 60 * 60 * 1000
+    const incidents = parseOoni(text).filter(incident => {
+      const startTime = new Date(incident.start_time).getTime()
+      return startTime > sevenDaysAgo
+    })
     const previousCount = store.ooniIncidents.length
     store.ooniIncidents = incidents
     store.lastUpdated['ooniIncidents'] = Date.now()

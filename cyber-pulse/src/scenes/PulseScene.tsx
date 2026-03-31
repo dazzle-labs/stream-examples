@@ -2,7 +2,7 @@ import { useRef, useEffect } from 'react'
 import { store } from '../data/store'
 
 const WIDTH = 1280
-const HEIGHT = 720
+const HEIGHT = 652
 const CENTER_X = WIDTH / 2
 const CENTER_Y = HEIGHT / 2
 const RING_COUNT = 6

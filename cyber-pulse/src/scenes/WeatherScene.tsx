@@ -3,19 +3,18 @@ import { store } from '../data/store'
 import type { InfoconLevel } from '../data/types'
 
 const WIDTH = 1280
-const HEIGHT = 720
+const HEIGHT = 652
 const CENTER_X = WIDTH / 2
-const CENTER_Y = HEIGHT / 2 - 30
+const CENTER_Y = HEIGHT / 2 - 10
 const GAUGE_RADIUS = 180
 const GAUGE_STROKE = 12
-const MINI_RADIUS = 40
-const MINI_STROKE = 6
-const MINI_ORBIT_RADIUS = 300
+const MINI_RADIUS = 32
+const MINI_STROKE = 5
 const ARC_START = Math.PI * 0.75
 const ARC_END = Math.PI * 2.25
 const ARC_SPAN = ARC_END - ARC_START
-const SPARKLINE_HEIGHT = 60
-const SPARKLINE_Y = HEIGHT - 80
+const SPARKLINE_HEIGHT = 50
+const SPARKLINE_Y = HEIGHT - 60
 const SPARKLINE_LEFT = 120
 const SPARKLINE_RIGHT = WIDTH - 120
 const FONT = "'JetBrains Mono', monospace"
@@ -55,10 +54,6 @@ const SIGNALS: SignalDefinition[] = [
     getValue: () => Math.min(100, (store.degradedServiceCount / 5) * 100),
   },
   {
-    label: 'PORT DIV',
-    getValue: () => Math.min(100, (store.sansTopPorts.length / 20) * 100),
-  },
-  {
     label: 'MALWARE',
     getValue: () => Math.min(100, (store.feodoC2s.filter(c2 => c2.status === 'online').length / 50) * 100),
   },
@@ -66,14 +61,10 @@ const SIGNALS: SignalDefinition[] = [
     label: 'SOCIAL',
     getValue: () => Math.min(100, (store.communityPosts.length / 30) * 100),
   },
-  {
-    label: 'OONI',
-    getValue: () => Math.min(100, (store.ooniIncidents.length / 5) * 100),
-  },
 ]
 
 let animatedScore = 0
-const animatedSignals: number[] = new Array(8).fill(0)
+const animatedSignals: number[] = new Array(6).fill(0)
 let needleAngle = ARC_START
 
 function getThreatLabel(score: number): string {
@@ -237,17 +228,17 @@ function drawMiniArc(
     context.stroke()
   }
 
-  context.font = `bold 22px ${FONT}`
+  context.font = `bold 18px ${FONT}`
   context.fillStyle = getScoreColor(value)
   context.textAlign = 'center'
   context.textBaseline = 'middle'
   context.fillText(String(Math.round(value)), centerX, centerY + 2)
 
-  context.font = `14px ${FONT}`
-  context.fillStyle = 'rgba(255, 255, 255, 0.4)'
+  context.font = `11px ${FONT}`
+  context.fillStyle = 'rgba(255, 255, 255, 0.35)'
   context.textAlign = 'center'
   context.textBaseline = 'top'
-  context.fillText(label, centerX, centerY + MINI_RADIUS + 10)
+  context.fillText(label, centerX, centerY + MINI_RADIUS + 8)
 }
 
 function drawSparkline(context: CanvasRenderingContext2D) {
@@ -324,12 +315,6 @@ function drawBackground(context: CanvasRenderingContext2D, score: number) {
   radialGradient.addColorStop(1, 'rgba(0, 0, 0, 0)')
   context.fillStyle = radialGradient
   context.fillRect(0, 0, WIDTH, HEIGHT)
-
-  const centerGlow = context.createRadialGradient(CENTER_X, CENTER_Y, 0, CENTER_X, CENTER_Y, 450)
-  centerGlow.addColorStop(0, hexToRGBA(getScoreColor(score), 0.06))
-  centerGlow.addColorStop(1, 'rgba(0, 0, 0, 0)')
-  context.fillStyle = centerGlow
-  context.fillRect(0, 0, WIDTH, HEIGHT)
 }
 
 function drawTitle(context: CanvasRenderingContext2D) {
@@ -338,7 +323,7 @@ function drawTitle(context: CanvasRenderingContext2D) {
   context.textAlign = 'center'
   context.textBaseline = 'top'
   context.letterSpacing = '6px'
-  context.fillText('THREAT WEATHER', CENTER_X, 30)
+  context.fillText('THREAT WEATHER', CENTER_X, 28)
   context.letterSpacing = '0px'
 }
 
@@ -377,14 +362,21 @@ export function WeatherScene() {
       drawNeedle(context, needleAngle)
       drawScoreText(context, animatedScore)
 
+      const miniPositions: Array<{ x: number; y: number }> = [
+        { x: 100, y: 100 },
+        { x: 100, y: CENTER_Y },
+        { x: 100, y: CENTER_Y + 160 },
+        { x: WIDTH - 100, y: 100 },
+        { x: WIDTH - 100, y: CENTER_Y },
+        { x: WIDTH - 100, y: CENTER_Y + 160 },
+      ]
+
       for (let index = 0; index < SIGNALS.length; index++) {
         const signal = SIGNALS[index]
         const signalValue = animatedSignals[index]
-        if (!signal || signalValue === undefined) continue
-        const angle = (Math.PI * 2 * index) / SIGNALS.length - Math.PI / 2
-        const miniX = CENTER_X + Math.cos(angle) * MINI_ORBIT_RADIUS
-        const miniY = CENTER_Y + Math.sin(angle) * MINI_ORBIT_RADIUS
-        drawMiniArc(context, miniX, miniY, signalValue, signal.label)
+        const position = miniPositions[index]
+        if (!signal || signalValue === undefined || !position) continue
+        drawMiniArc(context, position.x, position.y, signalValue, signal.label)
       }
 
       drawSparkline(context)

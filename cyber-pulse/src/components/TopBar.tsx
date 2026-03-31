@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect } from 'react'
 import { store } from '../data/store'
 import type { InfoconLevel } from '../data/types'
 
@@ -9,6 +9,25 @@ const INFOCON_COLORS: Record<InfoconLevel, string> = {
   red: '#ef233c',
 }
 
+const INFOCON_LABELS: Record<InfoconLevel, string> = {
+  green: 'NORMAL',
+  yellow: 'ELEVATED',
+  orange: 'HIGH',
+  red: 'SEVERE',
+}
+
+const SERVICE_NAMES: Record<string, string> = {
+  github: 'GitHub',
+  cloudflare: 'Cloudflare',
+  discord: 'Discord',
+  openai: 'OpenAI',
+  datadog: 'Datadog',
+  reddit: 'Reddit',
+  atlassian: 'Atlassian',
+  gcp: 'GCP',
+  aws: 'AWS',
+}
+
 function formatUTCTime(date: Date): string {
   const hours = date.getUTCHours().toString().padStart(2, '0')
   const minutes = date.getUTCMinutes().toString().padStart(2, '0')
@@ -16,124 +35,83 @@ function formatUTCTime(date: Date): string {
   return `${hours}:${minutes}:${seconds}`
 }
 
-function ThreatGauge({ score }: { score: number }) {
-  const canvasReference = useRef<HTMLCanvasElement>(null)
-
-  const draw = useCallback((canvas: HTMLCanvasElement) => {
-    const context = canvas.getContext('2d')
-    if (!context) return
-
-    const size = 28
-    const center = size / 2
-    const radius = 10
-    const startAngle = Math.PI * 0.75
-    const endAngle = Math.PI * 2.25
-    const sweepAngle = endAngle - startAngle
-
-    context.clearRect(0, 0, size, size)
-
-    context.beginPath()
-    context.arc(center, center + 1, radius, startAngle, endAngle)
-    context.strokeStyle = 'rgba(255, 255, 255, 0.08)'
-    context.lineWidth = 2.5
-    context.lineCap = 'round'
-    context.stroke()
-
-    const normalizedScore = Math.max(0, Math.min(100, score))
-    const filledAngle = startAngle + (sweepAngle * normalizedScore) / 100
-    let color = '#00e5ff'
-    if (normalizedScore >= 80) color = '#ef233c'
-    else if (normalizedScore >= 60) color = '#f77f00'
-    else if (normalizedScore >= 40) color = '#ffbe0b'
-    else if (normalizedScore >= 20) color = '#00e5ff'
-
-    if (normalizedScore > 0) {
-      context.beginPath()
-      context.arc(center, center + 1, radius, startAngle, filledAngle)
-      context.strokeStyle = color
-      context.lineWidth = 2.5
-      context.lineCap = 'round'
-      context.stroke()
-    }
-
-    context.fillStyle = color
-    context.font = 'bold 14px monospace'
-    context.textAlign = 'center'
-    context.textBaseline = 'middle'
-    context.fillText(String(normalizedScore), center, center + 2)
-  }, [score])
-
-  useEffect(() => {
-    const canvas = canvasReference.current
-    if (canvas) draw(canvas)
-  }, [draw])
-
-  return (
-    <canvas
-      ref={canvasReference}
-      width={28}
-      height={28}
-      className="shrink-0"
-    />
-  )
+function threatColor(score: number): string {
+  if (score < 20) return '#3b82f6'
+  if (score < 40) return '#00e5ff'
+  if (score < 60) return '#ffbe0b'
+  if (score < 80) return '#f77f00'
+  return '#ef233c'
 }
 
 export function TopBar() {
   const [utcTime, setUtcTime] = useState(() => formatUTCTime(new Date()))
   const [threatScore, setThreatScore] = useState(store.threatWeather)
   const [infocon, setInfocon] = useState(store.sansInfocon)
-  const [degradedCount, setDegradedCount] = useState(store.degradedServiceCount)
+  const [degradedNames, setDegradedNames] = useState<string[]>([])
 
   useEffect(() => {
     const interval = setInterval(() => {
       setUtcTime(formatUTCTime(new Date()))
       setThreatScore(store.threatWeather)
       setInfocon(store.sansInfocon)
-      setDegradedCount(store.degradedServiceCount)
+      const names: string[] = []
+      for (const key of Object.keys(SERVICE_NAMES)) {
+        const status = store.serviceStatuses[key]
+        if (status && status.indicator !== 'none' && status.indicator !== 'operational') {
+          names.push(SERVICE_NAMES[key] ?? key)
+        }
+      }
+      setDegradedNames(names)
     }, 1000)
     return () => clearInterval(interval)
   }, [])
 
   return (
     <div
-      className="absolute top-0 left-0 right-0 z-40 flex items-center px-4 font-mono"
+      className="absolute top-0 left-0 right-0 z-40 flex items-center px-5"
       style={{
         height: '44px',
-        background: 'rgba(1, 2, 8, 0.85)',
+        background: 'rgba(1, 2, 8, 0.9)',
         borderBottom: '1px solid rgba(255, 255, 255, 0.06)',
+        fontFamily: "'JetBrains Mono', monospace",
       }}
     >
-      <div className="flex items-center gap-3 flex-1">
-        <ThreatGauge score={threatScore} />
-        <div className="flex items-center gap-1.5">
-          <div
-            className="w-2 h-2 rounded-full breathing"
-            style={{ backgroundColor: INFOCON_COLORS[infocon] }}
-          />
-          <span className="text-[16px] uppercase tracking-wider opacity-40 text-white">
-            Infocon
+      <div className="flex items-center gap-5 flex-1">
+        <div className="flex items-center gap-2">
+          <span className="text-[20px] font-bold tabular-nums" style={{ color: threatColor(threatScore) }}>
+            {threatScore}
+          </span>
+          <span className="text-[14px] uppercase" style={{ color: '#505060' }}>
+            THREAT
+          </span>
+        </div>
+        <div className="flex items-center gap-2">
+          <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: INFOCON_COLORS[infocon] }} />
+          <span className="text-[14px] uppercase" style={{ color: INFOCON_COLORS[infocon] }}>
+            {INFOCON_LABELS[infocon]}
+          </span>
+          <span className="text-[14px] uppercase" style={{ color: '#404050' }}>
+            ALERT LEVEL
           </span>
         </div>
       </div>
 
-      <div className="text-[16px] uppercase tracking-[0.25em] text-white opacity-20 font-mono">
-        Cyber Pulse
+      <div className="text-[14px] uppercase tracking-[0.3em]" style={{ color: '#303040' }}>
+        CYBER PULSE
       </div>
 
-      <div className="flex items-center gap-4 flex-1 justify-end">
-        {degradedCount > 0 && (
-          <div className="flex items-center gap-1.5">
-            <span className="text-[16px] font-mono text-[#ef233c]">
-              {degradedCount}
-            </span>
-            <span className="text-[16px] uppercase tracking-wider opacity-40 text-white">
-              Incidents
+      <div className="flex items-center gap-5 flex-1 justify-end">
+        {degradedNames.length > 0 && (
+          <div className="flex items-center gap-2">
+            <div className="w-2.5 h-2.5 rounded-full breathing" style={{ background: '#f77f00' }} />
+            <span className="text-[14px]" style={{ color: '#f77f00' }}>
+              {degradedNames.join(', ')} degraded
             </span>
           </div>
         )}
-        <span className="text-[18px] font-mono text-white opacity-50 tabular-nums">
+        <span className="text-[16px] tabular-nums" style={{ color: '#505060' }}>
           {utcTime}
-          <span className="text-[14px] ml-1 opacity-50">UTC</span>
+          <span className="text-[14px] ml-1">UTC</span>
         </span>
       </div>
     </div>

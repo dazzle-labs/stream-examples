@@ -18,7 +18,7 @@ export function App() {
   return (
     <div className="relative w-[1280px] h-[720px] overflow-hidden" style={{ backgroundColor: '#010208' }}>
       <TopBar />
-      <div className="absolute inset-0" style={{ top: '44px', bottom: '24px' }}>
+      <div className="absolute inset-0" style={{ top: '44px', bottom: '36px' }}>
         <SceneManager />
       </div>
       <BottomTicker />

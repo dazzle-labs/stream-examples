@@ -3,7 +3,7 @@ import { store } from '../data/store'
 import type { Breach } from '../data/types'
 
 const WIDTH = 1280
-const HEIGHT = 720
+const HEIGHT = 652
 const FONT = "'JetBrains Mono', monospace"
 const TIMELINE_Y = HEIGHT * 0.4
 const TIMELINE_LEFT = 80
