@@ -1,4 +1,4 @@
-const isDev = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+const isDev = import.meta.env.DEV
 
 export function yahooUrl(path: string): string {
   return isDev ? `/api/yahoo${path}` : `https://query1.finance.yahoo.com${path}`

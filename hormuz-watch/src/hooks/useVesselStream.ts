@@ -28,7 +28,7 @@ const STORAGE_KEY = 'hormuz-watch-vessels'
 const STALE_VESSEL_TIMEOUT = 12 * 60 * 60 * 1000
 const RECONNECT_DELAY = 5000
 const SAVE_THROTTLE = 5000
-const isDev = typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
+const isDev = import.meta.env.DEV
 
 function loadFromStorage(): Map<string, Vessel> {
   try {
